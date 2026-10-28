@@ -52,6 +52,11 @@ impl ProjectFs {
         &self.root_path
     }
 
+    /// A new handle to the root directory (for confined walks).
+    pub(crate) fn dir_handle(&self) -> std::io::Result<Dir> {
+        self.root.try_clone()
+    }
+
     pub fn read(&self, rel: &str) -> Result<FileContent, ProjectError> {
         let path = validate_relative(rel)?;
         let mut file = self
