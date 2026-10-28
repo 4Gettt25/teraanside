@@ -2,5 +2,6 @@ dist
 src-tauri
 src/lib/generated
 pnpm-lock.yaml
+.github
 CLAUDE.md
 DESIGN.md

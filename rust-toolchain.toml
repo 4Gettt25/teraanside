@@ -1,0 +1,5 @@
+# Pins the toolchain for rustup users and CI (matches rust-version in src-tauri/Cargo.toml).
+[toolchain]
+channel = "1.97.1"
+profile = "minimal"
+components = ["clippy", "rustfmt"]
