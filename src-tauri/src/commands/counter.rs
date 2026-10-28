@@ -11,6 +11,7 @@ pub async fn start_counter(
     request: CounterRequest,
     on_event: Channel<CounterEvent>,
 ) -> Result<(), CommandError> {
+    tracing::debug!(?request, "start_counter");
     diagnostics::run_counter(request, |event| {
         on_event.send(event).map_err(|err| {
             tracing::warn!(error = %err, "counter channel closed");
@@ -18,5 +19,6 @@ pub async fn start_counter(
         })
     })
     .await?;
+    tracing::debug!("start_counter finished");
     Ok(())
 }
