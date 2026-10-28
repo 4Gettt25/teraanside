@@ -1,5 +1,16 @@
 {
   "app": {
-    "title": "IaC Studio"
+    "title": "IaC Studio",
+    "subtitle": "M0-Gerüst – IPC-Diagnose"
+  },
+  "common": {
+    "error": "Fehler ({code}): {message}",
+    "hint": "Hinweis: {hint}"
+  },
+  "ping": {
+    "title": "Ping",
+    "message": "Nachricht",
+    "send": "Ping senden",
+    "reply": "Antwort: „{message}“ vom Core {version} ({os})"
   }
 }

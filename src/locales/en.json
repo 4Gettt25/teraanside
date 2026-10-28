@@ -1,5 +1,16 @@
 {
   "app": {
-    "title": "IaC Studio"
+    "title": "IaC Studio",
+    "subtitle": "M0 skeleton – IPC diagnostics"
+  },
+  "common": {
+    "error": "Error ({code}): {message}",
+    "hint": "Hint: {hint}"
+  },
+  "ping": {
+    "title": "Ping",
+    "message": "Message",
+    "send": "Send ping",
+    "reply": "Reply: \"{message}\" from core {version} ({os})"
   }
 }

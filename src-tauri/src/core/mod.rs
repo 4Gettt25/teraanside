@@ -4,6 +4,7 @@
 mod error;
 
 pub mod ansible;
+pub mod diagnostics;
 pub mod git;
 pub mod lsp;
 pub mod project;
