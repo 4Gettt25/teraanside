@@ -12,5 +12,18 @@
     "message": "Nachricht",
     "send": "Ping senden",
     "reply": "Antwort: „{message}“ vom Core {version} ({os})"
+  },
+  "counter": {
+    "title": "Streaming-Zähler",
+    "count": "Events",
+    "interval": "Intervall (ms)",
+    "start": "Stream starten",
+    "progress": "{value} / {total} (empfangene Ticks: {ticks})",
+    "status": {
+      "idle": "Bereit",
+      "running": "Läuft",
+      "finished": "Fertig",
+      "error": "Fehlgeschlagen"
+    }
   }
 }

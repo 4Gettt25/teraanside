@@ -20,7 +20,10 @@ pub fn run() {
     tracing::info!(version = env!("CARGO_PKG_VERSION"), "starting IaC Studio");
 
     if let Err(err) = tauri::Builder::default()
-        .invoke_handler(tauri::generate_handler![commands::ping::ping])
+        .invoke_handler(tauri::generate_handler![
+            commands::ping::ping,
+            commands::counter::start_counter
+        ])
         .run(tauri::generate_context!())
     {
         tracing::error!(error = %err, "tauri application exited with an error");

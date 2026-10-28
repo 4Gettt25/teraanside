@@ -12,5 +12,18 @@
     "message": "Message",
     "send": "Send ping",
     "reply": "Reply: \"{message}\" from core {version} ({os})"
+  },
+  "counter": {
+    "title": "Streaming counter",
+    "count": "Events",
+    "interval": "Interval (ms)",
+    "start": "Start stream",
+    "progress": "{value} / {total} (received ticks: {ticks})",
+    "status": {
+      "idle": "Idle",
+      "running": "Running",
+      "finished": "Finished",
+      "error": "Failed"
+    }
   }
 }

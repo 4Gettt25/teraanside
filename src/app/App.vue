@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { useI18n } from "vue-i18n";
+import CounterPanel from "../features/diagnostics/CounterPanel.vue";
 import PingPanel from "../features/diagnostics/PingPanel.vue";
 
 const { t } = useI18n();
@@ -12,6 +13,7 @@ const { t } = useI18n();
       <p>{{ t("app.subtitle") }}</p>
     </header>
     <PingPanel />
+    <CounterPanel />
   </main>
 </template>
 
@@ -44,6 +46,21 @@ main {
 }
 .status.error::before {
   content: "✗ ";
+}
+.status.running::before {
+  content: "⟳ ";
+}
+.status.finished::before {
+  content: "✓ ";
+}
+.status.idle::before {
+  content: "○ ";
+}
+.status.finished {
+  color: #1a6b2a;
+}
+progress {
+  width: 100%;
 }
 .status.ok {
   color: #1a6b2a;
