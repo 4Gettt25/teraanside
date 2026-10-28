@@ -1,0 +1,20 @@
+# Dependencies / build output
+node_modules/
+dist/
+src-tauri/target/
+src-tauri/gen/schemas/
+
+# Editors / OS
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+*.swp
+
+# Logs / env
+*.log
+.env
+.env.*
+
+# Local IaC Studio run history (never commit)
+.iac-studio/runs/
