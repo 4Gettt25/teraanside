@@ -19,6 +19,34 @@ impl Platform for LinuxPlatform {
         use std::os::unix::fs::PermissionsExt;
         cap_std::fs::Permissions::from_std(std::fs::Permissions::from_mode(0o644))
     }
+
+    fn write_private_file(&self, path: &camino::Utf8Path, bytes: &[u8]) -> std::io::Result<()> {
+        use std::io::Write;
+        use std::os::unix::fs::{DirBuilderExt, OpenOptionsExt};
+        let parent = path
+            .parent()
+            .ok_or_else(|| std::io::Error::other("path has no parent directory"))?;
+        std::fs::DirBuilder::new()
+            .recursive(true)
+            .mode(0o700)
+            .create(parent)?;
+        let file_name = path.file_name().unwrap_or("file");
+        let tmp = parent.join(format!(".{file_name}.tmp-{}", std::process::id()));
+        let result = (|| {
+            let mut f = std::fs::OpenOptions::new()
+                .write(true)
+                .create_new(true)
+                .mode(0o600)
+                .open(&tmp)?;
+            f.write_all(bytes)?;
+            f.sync_all()?;
+            std::fs::rename(&tmp, path)
+        })();
+        if result.is_err() {
+            let _ = std::fs::remove_file(&tmp);
+        }
+        result
+    }
 }
 
 /// Resolves the XDG base directories (XDG Base Directory Specification):

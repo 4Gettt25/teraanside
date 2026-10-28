@@ -33,6 +33,9 @@ pub trait Platform: Send + Sync {
     fn app_dirs(&self) -> Result<AppDirs, PlatformError>;
     /// Permissions for newly created user files (e.g. a new file saved from the editor).
     fn new_file_permissions(&self) -> cap_std::fs::Permissions;
+    /// Atomically writes an app-private file (only the user can read it), creating
+    /// parent directories. Used for app state such as the trust store.
+    fn write_private_file(&self, path: &camino::Utf8Path, bytes: &[u8]) -> std::io::Result<()>;
 }
 
 /// The platform implementation for the current target.

@@ -4,6 +4,9 @@
 pub mod config;
 mod error;
 pub mod fs;
+mod open;
 pub mod tree;
+pub mod trust;
 
 pub use error::ProjectError;
+pub use open::OpenProject;
