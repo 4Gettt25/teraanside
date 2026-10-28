@@ -16,20 +16,27 @@ Desktop-App (Tauri 2 + Rust-Core + Vue 3) zum Bearbeiten und Ausführen von Terr
 
 ## Befehle
 
-> Beim Scaffolding in M0 hier die tatsächlichen Befehle eintragen und aktuell halten.
+Voraussetzungen (Linux/Arch): Rust 1.97.1 (`rust-toolchain.toml`), Node ≥ 26, pnpm (Version per `packageManager` in `package.json`), Tauri-Systempakete laut https://tauri.app/start/prerequisites/.
 
 ```bash
-pnpm install                 # Frontend-Abhängigkeiten
-pnpm tauri dev               # App im Entwicklungsmodus
-pnpm lint && pnpm typecheck  # Frontend-Checks
+pnpm install                 # Frontend-Abhängigkeiten (Lockfile: pnpm-lock.yaml)
+pnpm tauri dev               # App im Entwicklungsmodus (Vite auf :1420 + Rust-Core)
+RUST_LOG=info,iac_studio_lib=debug pnpm tauri dev   # mit Debug-Logs des Cores
+scripts/check.sh             # komplettes Qualitätsgate (lokal und in CI)
+pnpm gen:types               # TS-Typen aus Rust neu erzeugen -> src/lib/generated/ (committen!)
+pnpm lint                    # ESLint (vue + typescript-eslint strictTypeChecked)
+pnpm format                  # Prettier schreiben; pnpm format:check prüft nur
+pnpm typecheck               # vue-tsc (App + Tooling-Configs)
 pnpm test                    # Vitest
-cargo fmt --check            # in src-tauri/
-cargo clippy --all-targets -- -D warnings
-cargo test                   # in src-tauri/
-pnpm tauri build             # Paket (AppImage/.deb)
+cd src-tauri && cargo fmt --check
+cd src-tauri && cargo clippy --all-targets -- -D warnings
+cd src-tauri && cargo test   # exportiert dabei auch die ts-rs-Bindings
+pnpm tauri build             # Paket (AppImage/.deb), erst in M5 relevant
 ```
 
-**Qualitätsgate (vor jedem Commit):** `cargo fmt --check`, `cargo clippy -- -D warnings`, `cargo test`, `pnpm lint`, `pnpm typecheck`, `pnpm test`. Ein Skript `scripts/check.sh` bündelt das.
+**Qualitätsgate (vor jedem Commit):** `scripts/check.sh` führt aus: `cargo fmt --check`, `cargo clippy --locked --all-targets -- -D warnings`, `cargo test --locked`, Drift-Prüfung der generierten Typen (`src/lib/generated/` muss zum Rust-Code passen), `pnpm lint`, `pnpm format:check`, `pnpm typecheck`, `pnpm test`. CI: GitHub Actions (`.github/workflows/ci.yml`) ruft dasselbe Skript auf.
+
+**Typgenerierung:** Frontend-sichtbare Typen mit `#[derive(TS)] #[ts(export)]` (ts-rs) annotieren; Exportziel steht in `.cargo/config.toml`. Tauri-Aufrufe nur über `src/lib/client.ts`.
 
 ## Repository-Struktur (Soll)
 
@@ -40,8 +47,11 @@ src-tauri/src/
   core/
     project/ toolchain/ runner/ terraform/ ansible/
     lsp/ schema/ git/ secrets/
+    diagnostics/     ping + Demo-Stream (M0)
   platform/          alles OS-Spezifische (nur Linux-Impl. im MVP)
 src/                 Vue-Frontend (siehe DESIGN.md Abschnitt 5)
+  lib/client.ts      typisierter Tauri-Client
+  lib/generated/     ts-rs-Ausgabe, nie von Hand editieren
 fixtures/
   terraform/*.ndjson ansible/*.ndjson   echte aufgezeichnete Läufe
 scripts/
@@ -106,5 +116,5 @@ DESIGN.md  CLAUDE.md
 2. Verzeichnisstruktur gemäß „Repository-Struktur (Soll)“ anlegen, `platform/` mit Linux-Implementierung als Stub.
 3. Typgenerierung Rust → TypeScript einrichten und in `scripts/check.sh` prüfen.
 4. Einen Command (`ping`) und einen Streaming-Channel (z. B. Zähler-Events) Ende-zu-Ende implementieren, inklusive Reducer-Test im Frontend.
-5. `scripts/check.sh`, CI-Konfiguration (GitLab CI, `.gitlab-ci.yml`) und diese Befehlsliste aktualisieren.
+5. `scripts/check.sh`, CI-Konfiguration (GitHub Actions, `.github/workflows/ci.yml`; Repo liegt auf GitHub) und diese Befehlsliste aktualisieren.
 6. Abnahme M0 laut `DESIGN.md` bestätigen, bevor M1 beginnt.

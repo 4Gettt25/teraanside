@@ -68,7 +68,7 @@ Die konkreten Versionen werden beim Scaffolding aus den aktuellen Releases besti
 **Grundprinzipien**
 1. **Core ist die einzige Instanz, die Prozesse startet und Dateien schreibt.** Das Frontend ruft nur typisierte Commands auf.
 2. **Alles Langlaufende streamt.** Prozessausgabe wird im Core zu typisierten Events geparst und über Tauri-Channels ans Frontend gesendet, nicht als Rohtext.
-3. **Typisierte Verträge.** Event- und Command-Typen werden in Rust definiert und per `ts-rs` oder `specta` nach TypeScript generiert (kein handgepflegtes Duplikat).
+3. **Typisierte Verträge.** Event- und Command-Typen werden in Rust definiert und per **`ts-rs`** nach TypeScript generiert (kein handgepflegtes Duplikat; Entscheidung M0, siehe Abschnitt 14 Nr. 10). Die dünnen Aufruf-Wrapper liegen in `src/lib/client.ts`.
 4. **Plattformneutrale Abstraktion von Anfang an.** Alles OS-Spezifische (Pfade, Prozessstart, Toolchain-Orte) liegt hinter dem `platform`-Modul, damit Windows später nachgezogen werden kann (Abschnitt 13).
 
 ---
@@ -322,8 +322,12 @@ Geplanter Windows-Ansatz (später zu validieren):
 | 5 | OpenTofu vs. Terraform: JSON-Ausgabeformate leicht unterschiedlich | Parser gegen beide testen, Fixtures für beide |
 | 6 | Lizenz/Redistribution von Terraform-Binaries (BSL) | Binaries nicht bündeln, nur vom Nutzer-Rechner aus offizieller Quelle laden |
 | 7 | Sehr große Pläne/Läufe (tausende Ressourcen/Events) | Virtualisierte Listen, Event-Batching (z. B. 50 ms), Backpressure im Channel |
-| 8 | UI-Sprache | Vorschlag: i18n-fähig ab Tag 1 (`vue-i18n`), Quelltext/Kommentare Englisch, UI Deutsch und Englisch |
+| 8 | ~~UI-Sprache~~ | **Entschieden (M0):** `vue-i18n` (Composition-Modus) ab Tag 1, UI Deutsch und Englisch, Quelltext/Kommentare Englisch. Locale-Dateien `src/locales/{de,en}.json`, ein Test prüft gleiche Schlüssel; ESLint `vue/no-bare-strings-in-template` verhindert hartkodierte Texte. |
 | 9 | Arbeitstitel/Name, Lizenz des Projekts | Vor erstem Release klären |
+| 10 | ~~`ts-rs` vs. `specta`~~ | **Entschieden (M0): `ts-rs` 12.** Stabil; `specta`/`tauri-specta` 2.x waren im Okt. 2026 noch Release Candidates. Folge: Command-Wrapper in `src/lib/client.ts` handgeschrieben (nur Namen/Argumente, Typen generiert). Neu bewerten, falls `tauri-specta` 2 stabil wird. Export während `cargo test`, Drift-Prüfung in `scripts/check.sh`. |
+| 11 | TypeScript-Version | TypeScript 7 ist erschienen, `typescript-eslint` 8.x unterstützt aber nur `<6.1`. Deshalb TS 6.0.3 gepinnt; Upgrade, sobald `typescript-eslint` TS 7 unterstützt. |
+| 12 | CI-Plattform | Repo liegt auf GitHub → GitHub Actions (`.github/workflows/ci.yml`) statt GitLab CI. Die Logik steckt in `scripts/check.sh`, ein Wechsel ist billig. |
+| 13 | Windows-Port: `platform`-Modul | `platform/mod.rs` bricht auf Nicht-Linux-Zielen absichtlich mit `compile_error!` ab. Beim Windows-Port durch eine `windows.rs`-Implementierung ersetzen (Trait `Platform` ist dafür ausgelegt). |
 
 ---
 
