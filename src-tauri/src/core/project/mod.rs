@@ -7,6 +7,7 @@ pub mod fs;
 mod open;
 pub mod tree;
 pub mod trust;
+pub mod watch;
 
 pub use error::ProjectError;
 pub use open::OpenProject;

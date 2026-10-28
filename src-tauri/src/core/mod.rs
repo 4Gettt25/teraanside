@@ -11,7 +11,9 @@ pub mod project;
 pub mod runner;
 pub mod schema;
 pub mod secrets;
+pub mod settings;
 pub mod terraform;
 pub mod toolchain;
+pub mod workspace;
 
 pub use error::CoreError;

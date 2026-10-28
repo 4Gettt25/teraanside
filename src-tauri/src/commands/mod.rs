@@ -3,5 +3,6 @@
 pub mod counter;
 mod error;
 pub mod ping;
+pub mod project;
 
 pub use error::CommandError;
