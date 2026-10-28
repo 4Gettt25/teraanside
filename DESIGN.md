@@ -80,6 +80,9 @@ Die konkreten Versionen werden beim Scaffolding aus den aktuellen Releases besti
 - Liefert eine Baumstruktur mit semantischen Knoten (Playbook, Rolle, Inventory, Modul, Variablen-Datei) statt nur Dateien.
 - Datei-Watcher (`notify`) für externe Änderungen.
 - Projektkonfiguration in `.iac-studio/project.toml` (Toolchain-Pins, Run-Profile, Inventory-Auswahl). Diese Datei ist committbar.
+- **Dateizugriff (umgesetzt M1a):** Jeder Lese-/Schreibzugriff wird relativ zu einem offenen Verzeichnis-Handle des Projektordners aufgelöst (`cap-std`, unter Linux `openat2` mit `RESOLVE_BENEATH`). Die Pfadprüfung passiert damit *beim* Zugriff; ein Symlink-Wechsel zwischen Prüfung und Zugriff kann nicht aus dem Projekt führen (Race-Test mit 5.000 Zugriffen). Symlinks innerhalb des Projekts werden gelesen, nach außen nicht; Schreiben durch Symlinks wird abgelehnt.
+- Schreiben atomar: temporäre Datei im Zielverzeichnis, `fsync`, `rename`; Dateirechte bleiben erhalten. Konflikterkennung über SHA256 des zuletzt geladenen Inhalts (Editor bietet „von der Platte laden“ oder „überschreiben“). Schreiben unterhalb von `.git/` ist gesperrt (Hooks wären Codeausführung).
+- Öffnen: neue Projekte nur über den nativen Ordnerdialog (vom Core angezeigt, die Webview hat keine Dialog-Berechtigung), sonst aus der Liste zuletzt geöffneter Projekte oder per Kommandozeile `iac-studio [ORDNER [DATEI]]`. Die Webview kann keine beliebigen Pfade öffnen.
 
 ### 4.2 `toolchain`
 - Verwaltet pro Projekt: Terraform **oder** OpenTofu (Version), Python/Ansible (Version), `ansible-lint`, `tflint`, `terraform-ls`, `ansible-language-server`.
@@ -243,6 +246,8 @@ Jeder Lauf hat zusätzlich einen xterm.js-Tab mit der unveränderten Ausgabe (Fa
 ### 7.2 Projektansicht
 Semantischer Baum: Terraform (Module, Variablen, Outputs, Provider), Ansible (Playbooks, Rollen mit Tasks/Handlers/Templates, Inventory-Gruppen/Hosts, Group-/Host-Vars). Kontextaktionen: „Neue Rolle“, „Neues Modul“, „Playbook ausführen“, „Plan starten“.
 
+**Stand M1a:** Die Klassifizierung beruht auf Dateisystem-Konventionen: Terraform-Root-Module und Module (unter `modules/`), `.tf`/`.tfvars`/Lock-Datei, `ansible.cfg`, Playbooks (günstige Inhaltsprüfung: Liste mit `hosts:`/`import_playbook:`), `roles/<rolle>/<bereich>`, Inventory, `group_vars`/`host_vars`, Collection-Requirements, Projektkonfiguration. Variablen, Outputs, Provider und Inventory-Hosts als eigene Knoten brauchen HCL-/YAML-Parser und kommen mit M4 (Parser-Spike #3). Symlinks werden angezeigt, aber nicht verfolgt; `.git`, `.terraform`, venvs und die Run-Historie sind ausgeblendet; Limits 50.000 Einträge / Tiefe 24.
+
 ### 7.3 Formularansicht (schema-getrieben)
 - Picker für Terraform-Ressourcen/Datenquellen und Ansible-Module mit Suche und Doku.
 - Formular aus dem Schema: Pflichtfelder zuerst, Typen → passende Eingabe (Bool → Toggle, Liste → Listeneditor, Block → verschachtelte Gruppe, Choices → Dropdown).
@@ -277,7 +282,13 @@ Beim ersten Öffnen eines Projekts: erkennt benötigte Tools, zeigt einen Einric
 - **Secrets:** nie in Argumenten, nie im Log, Redaktion vor Persistierung; temporäre Secret-Dateien 0600 und danach entfernen; `sensitive`-Werte aus Terraform maskieren.
 - **Downloads:** Checksum-/Signaturprüfung, nur aus konfigurierten Quellen (Allowlist).
 - **Vertrauensmodell für Projekte:** Beim Öffnen eines unbekannten Repos keine automatische Ausführung (Terraform-Provider, `local-exec`, Ansible-Plugins können beliebigen Code ausführen). Erst nach Bestätigung („Projekt vertrauen“) laufen `init`/Plan/LSP-Features, die Code ausführen.
-- **CSP** im Webview strikt, keine Remote-Skripte.
+- **CSP** im Webview strikt, keine Remote-Skripte. Stand M1a (`tauri.conf.json`), jede Lockerung gegenüber `default-src 'self'` begründet und gemessen:
+  - `script-src 'self' 'wasm-unsafe-eval'`: die TextMate-Engine (Oniguruma) läuft als WebAssembly. Gegenprobe in der gebauten App: ohne die Direktive bleibt Terraform-Code ohne Hervorhebung, und zwar **ohne Fehlermeldung**. `'unsafe-eval'` ist nicht nötig und nicht gesetzt.
+  - `worker-src 'self' blob:`: Monaco- und TextMate-Worker werden teils über `blob:`-URLs gestartet (Spike 14.2).
+  - `connect-src 'self' ipc: http://ipc.localhost blob: data:`: Tauri-IPC sowie Grammatik-, Theme- und Erweiterungsdateien, die die VS-Code-Dienste per `fetch` aus Bundle, `blob:` oder `data:` laden. Keine fremden Hosts.
+  - `img-src`/`font-src` mit `data:` (`blob:` für Bilder): Codicons und Theme-Ressourcen.
+  - `style-src 'unsafe-inline'`: dynamische Styles von Monaco und Vue-Scoped-Styles. Bleibt beobachtet; eine Umstellung auf Nonces wird geprüft, wenn Tauri sie für Styles zuverlässig injiziert.
+- **Vertrauensmodell (umgesetzt M1a):** Vertrauen wird pro kanonischem Projektpfad (exakte Übereinstimmung, kein Präfix) in `$XDG_CONFIG_HOME/iac-studio/trust.toml` (0600) gespeichert. Code, der Projektinhalte ausführt, verlangt den Typ `TrustedProject`, den nur `TrustStore::check` erzeugt; ein `compile_fail`-Doctest belegt, dass er sich nicht fälschen lässt. Escape im Vertrauensdialog bedeutet „eingeschränkt“, nie „vertraut“.
 - Terraform-State und Plan-Dateien können Secrets enthalten: Run-Persistierung berücksichtigt das (Plan-Dateien nicht in die Historie kopieren oder verschlüsseln).
 
 ---
@@ -351,6 +362,8 @@ Geplanter Windows-Ansatz (später zu validieren):
 | 12 | CI-Plattform | Repo liegt auf GitHub → GitHub Actions (`.github/workflows/ci.yml`) statt GitLab CI. Die Logik steckt in `scripts/check.sh`, ein Wechsel ist billig. |
 | 13 | Windows-Port: `platform`-Modul | `platform/mod.rs` bricht auf Nicht-Linux-Zielen absichtlich mit `compile_error!` ab. Beim Windows-Port durch eine `windows.rs`-Implementierung ersetzen (Trait `Platform` ist dafür ausgelegt). |
 | 14 | uv: Herkunftsnachweis über SHA256 hinaus (Folgeaufgabe) | M1 prüft uv gegen einen **pro gepinnter Version fest in der App hinterlegten SHA256**. Geprüft am 2026-10-28: Astral veröffentlicht für Release-Assets **GitHub-Attestations** (für `uv-x86_64-unknown-linux-gnu.tar.gz` 0.13.6: SLSA Provenance v1 aus `astral-sh/uv` `.github/workflows/release.yml` und eine in-toto-Release-Attestation, abrufbar über `GET /repos/astral-sh/uv/attestations/sha256:<digest>`). Folgeaufgabe nach M1: Sigstore-Bundle-Prüfung (Zertifikatsidentität = Release-Workflow von `astral-sh/uv`) im Toolchain-Manager ergänzen, Crate-Wahl dann bewerten. |
+| 15 | LGPL-2.1+ im Bundle: `jschardet` | Kommt über `@codingame/monaco-vscode-api` (Encoding-Erkennung) und landet als eigener Chunk im Frontend-Bundle. Wir lesen Dateien ausschließlich als UTF-8 im Core, die Encoding-Erkennung wird also nicht gebraucht. Vorschlag: per Vite-`resolve.alias` durch einen Stub ersetzen und das in `THIRD_PARTY_LICENSES.md` vermerken; alternativ LGPL-Pflichten erfüllen (Quelle/Ersetzbarkeit). Entscheidung vor dem ersten Release, spätestens M5. |
+| 16 | E2E-Tests der Desktop-App | `tauri-driver` fehlt, der vorhandene `WebKitWebDriver` gehört zu WebKitGTK 6.0, die App nutzt webkit2gtk-4.1. M1a wurde per Smoke-Test der gebauten App verifiziert (Start mit `iac-studio <repo> <datei>`, Fehlerbrücke Frontend → Core-Log). Playwright/WebDriver-E2E wie geplant später. |
 
 ### 14.1 Spike #2: Node-Bedarf von `ansible-language-server` (M1)
 
