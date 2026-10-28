@@ -1,10 +1,10 @@
 <script setup lang="ts">
 // Fallback editor (no syntax highlighting) used until/unless Monaco is available.
 import { ref, watch } from "vue";
-import { getBuffer } from "./buffers";
+import { getBuffer, setBuffer } from "./buffers";
 
 const props = defineProps<{ path: string; revision: number; label: string }>();
-const emit = defineEmits<{ change: [text: string] }>();
+const emit = defineEmits<{ change: [path: string] }>();
 const text = ref(getBuffer(props.path) ?? "");
 
 watch(
@@ -17,7 +17,8 @@ watch(
 function onInput(event: Event): void {
   const value = (event.target as HTMLTextAreaElement).value;
   text.value = value;
-  emit("change", value);
+  setBuffer(props.path, value);
+  emit("change", props.path);
 }
 </script>
 

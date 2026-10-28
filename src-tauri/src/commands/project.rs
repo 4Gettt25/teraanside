@@ -11,7 +11,7 @@ use crate::core::CoreError;
 use crate::core::project::fs::FileContent;
 use crate::core::project::tree::ProjectTree;
 use crate::core::settings::RecentProject;
-use crate::core::workspace::{ProjectId, ProjectInfo, Workspace};
+use crate::core::workspace::{InitialOpen, ProjectId, ProjectInfo, Workspace};
 
 /// Runs blocking core work off the async runtime.
 async fn blocking<T: Send + 'static>(
@@ -51,6 +51,12 @@ pub async fn project_open_dialog(
     };
     let ws = ws.inner().clone();
     blocking(move || ws.open(&path)).await.map(Some)
+}
+
+/// The project given on the command line, if any (returned once).
+#[tauri::command]
+pub fn project_initial(ws: State<'_, Arc<Workspace>>) -> Option<InitialOpen> {
+    ws.take_initial()
 }
 
 #[tauri::command]

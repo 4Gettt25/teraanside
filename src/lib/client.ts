@@ -7,6 +7,7 @@ import { toCommandError } from "./errors";
 import type { CounterEvent } from "./generated/CounterEvent";
 import type { CounterRequest } from "./generated/CounterRequest";
 import type { FileContent } from "./generated/FileContent";
+import type { InitialOpen } from "./generated/InitialOpen";
 import type { Pong } from "./generated/Pong";
 import type { ProjectEvent } from "./generated/ProjectEvent";
 import type { ProjectInfo } from "./generated/ProjectInfo";
@@ -17,6 +18,7 @@ export type {
   CounterEvent,
   CounterRequest,
   FileContent,
+  InitialOpen,
   Pong,
   ProjectEvent,
   ProjectInfo,
@@ -53,6 +55,11 @@ export function startCounter(
 /** Shows the native folder picker in the core; resolves to `null` if cancelled. */
 export function projectOpenDialog(title: string): Promise<ProjectInfo | null> {
   return call<ProjectInfo | null>("project_open_dialog", { title });
+}
+
+/** Project (and file) given on the command line; returned only once. */
+export function projectInitial(): Promise<InitialOpen | null> {
+  return call<InitialOpen | null>("project_initial", {});
 }
 
 export function projectOpenRecent(path: string): Promise<ProjectInfo> {

@@ -1,21 +1,24 @@
 /**
- * Current editor text per path, deliberately outside Vue reactivity: buffers can be
- * large and change on every keystroke; the store only tracks metadata (dirty, hash).
+ * Current editor text per path, deliberately outside Vue reactivity. Instead of
+ * copying the text on every keystroke, each editor registers a source function
+ * (Monaco: `model.getValue()`), which is only called when saving.
  */
-const buffers = new Map<string, string>();
+type BufferSource = () => string;
+
+const sources = new Map<string, BufferSource>();
 
 export function getBuffer(path: string): string | undefined {
-  return buffers.get(path);
+  return sources.get(path)?.();
 }
 
 export function setBuffer(path: string, text: string): void {
-  buffers.set(path, text);
+  sources.set(path, () => text);
+}
+
+export function setBufferSource(path: string, source: BufferSource): void {
+  sources.set(path, source);
 }
 
 export function dropBuffer(path: string): void {
-  buffers.delete(path);
-}
-
-export function clearBuffers(): void {
-  buffers.clear();
+  sources.delete(path);
 }

@@ -31,6 +31,15 @@ pub fn run() {
         }
     };
 
+    // `iac-studio [PROJECT_DIR [FILE]]`
+    let mut args = std::env::args().skip(1);
+    if let Some(dir) = args.next() {
+        let file = args.next();
+        if let Err(err) = workspace.open_from_args(camino::Utf8Path::new(&dir), file) {
+            tracing::warn!(error = %err, %dir, "could not open project from command line");
+        }
+    }
+
     if let Err(err) = tauri::Builder::default()
         // Used from Rust only (folder picker); no dialog permission is granted to the webview.
         .plugin(tauri_plugin_dialog::init())
@@ -39,6 +48,7 @@ pub fn run() {
             commands::ping::ping,
             commands::counter::start_counter,
             commands::project::project_open_dialog,
+            commands::project::project_initial,
             commands::project::project_open_recent,
             commands::project::project_recent,
             commands::project::project_close,

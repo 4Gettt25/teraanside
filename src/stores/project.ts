@@ -2,6 +2,7 @@ import { defineStore } from "pinia";
 import { ref, shallowRef } from "vue";
 import {
   projectClose,
+  projectInitial,
   projectOpenDialog,
   projectOpenRecent,
   projectRecent,
@@ -57,6 +58,14 @@ export const useProjectStore = defineStore("project", () => {
     await activate(await guard(() => projectOpenDialog(title)));
   }
 
+  /** Opens the command-line project, if any; returns the file to show. */
+  async function openInitial(): Promise<string | null> {
+    const initial = await guard(projectInitial);
+    if (!initial) return null;
+    await activate(initial.project);
+    return initial.file ?? null;
+  }
+
   async function openRecent(path: string): Promise<void> {
     await activate(await guard(() => projectOpenRecent(path)));
   }
@@ -102,6 +111,7 @@ export const useProjectStore = defineStore("project", () => {
     trustPending,
     loadRecent,
     openDialog,
+    openInitial,
     openRecent,
     refreshTree,
     setTrusted,

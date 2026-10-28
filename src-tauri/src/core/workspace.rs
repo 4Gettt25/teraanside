@@ -41,7 +41,18 @@ struct Entry {
     watcher: Mutex<Option<ProjectWatcher>>,
 }
 
+/// Project (and optional file) given on the command line: `iac-studio [DIR [FILE]]`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, optional_fields)]
+pub struct InitialOpen {
+    pub project: ProjectInfo,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub file: Option<String>,
+}
+
 pub struct Workspace {
+    initial: Mutex<Option<InitialOpen>>,
     next_id: AtomicU32,
     projects: Mutex<HashMap<ProjectId, Arc<Entry>>>,
     trust: Mutex<TrustStore>,
@@ -63,6 +74,7 @@ fn now_unix() -> u64 {
 impl Workspace {
     pub fn init(dirs: &AppDirs) -> Result<Self, CoreError> {
         Ok(Self {
+            initial: Mutex::new(None),
             next_id: AtomicU32::new(1),
             projects: Mutex::new(HashMap::new()),
             trust: Mutex::new(TrustStore::load(dirs.config.join("trust.toml"))?),
@@ -107,6 +119,19 @@ impl Workspace {
             return Err(ProjectError::UnknownProject.into());
         }
         self.open(Utf8Path::new(path))
+    }
+
+    /// Opens the project given on the command line. The path comes from the user's
+    /// shell, not from the webview.
+    pub fn open_from_args(&self, dir: &Utf8Path, file: Option<String>) -> Result<(), CoreError> {
+        let project = self.open(dir)?;
+        *lock(&self.initial) = Some(InitialOpen { project, file });
+        Ok(())
+    }
+
+    /// Returns the command-line project once (the frontend asks on start-up).
+    pub fn take_initial(&self) -> Option<InitialOpen> {
+        lock(&self.initial).take()
     }
 
     pub fn close(&self, id: ProjectId) {
@@ -267,6 +292,15 @@ mod tests {
         }
         assert!(!proj.join(".git/hooks/pre-commit").exists());
         assert!(ws.write_file(id, ".gitignore", "x\n", None).is_ok());
+    }
+
+    #[test]
+    fn initial_open_is_taken_once() {
+        let (_tmp, ws, proj) = setup();
+        ws.open_from_args(&proj, Some("main.tf".into())).unwrap();
+        let first = ws.take_initial().unwrap();
+        assert_eq!(first.file.as_deref(), Some("main.tf"));
+        assert!(ws.take_initial().is_none());
     }
 
     #[test]

@@ -36,8 +36,10 @@ function onKeydown(event: KeyboardEvent): void {
   }
 }
 
-onMounted(() => {
+onMounted(async () => {
   window.addEventListener("keydown", onKeydown);
+  const file = await project.openInitial();
+  if (file) await editor.open(file);
 });
 onBeforeUnmount(() => {
   window.removeEventListener("keydown", onKeydown);

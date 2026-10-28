@@ -72,7 +72,8 @@
     "reload": "Von der Platte laden",
     "overwrite": "Meine behalten und überschreiben",
     "contentOf": "Inhalt von {path}",
-    "empty": "Wähle links eine Datei aus."
+    "empty": "Wähle links eine Datei aus.",
+    "fallback": "Der Code-Editor konnte nicht geladen werden; es wird ein einfacher Texteditor ohne Hervorhebung verwendet."
   },
   "trust": {
     "title": "Vertraust du dem Projekt „{name}“?",

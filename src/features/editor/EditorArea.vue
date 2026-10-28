@@ -1,12 +1,29 @@
 <script setup lang="ts">
+import { computed, defineAsyncComponent, ref } from "vue";
 import { storeToRefs } from "pinia";
 import { useI18n } from "vue-i18n";
+import { reportFrontendError } from "../../lib/client";
 import { useEditorStore } from "../../stores/editor";
+import { useProjectStore } from "../../stores/project";
 import PlainEditor from "./PlainEditor.vue";
+
+// Monaco is several MB: load it only when the first file is opened.
+const MonacoEditor = defineAsyncComponent(() => import("./MonacoEditor.vue"));
 
 const { t } = useI18n();
 const editor = useEditorStore();
+const project = useProjectStore();
 const { state, activeTab, error } = storeToRefs(editor);
+const { info } = storeToRefs(project);
+const monacoFailed = ref(false);
+const tabRevisions = computed(() =>
+  state.value.tabs.map((tab) => ({ path: tab.path, revision: tab.revision })),
+);
+
+function onMonacoFailed(message: string): void {
+  monacoFailed.value = true;
+  reportFrontendError(`monaco failed to load: ${message}`);
+}
 
 function fileName(path: string): string {
   return path.split("/").pop() ?? path;
@@ -55,15 +72,27 @@ function fileName(path: string): string {
       {{ t("common.error", { code: error.code, message: error.message }) }}
     </p>
 
+    <p v-if="monacoFailed" class="notice" role="status">{{ t("editor.fallback") }}</p>
     <div class="editor-host">
-      <PlainEditor
-        v-if="activeTab"
-        :key="activeTab.path"
-        :path="activeTab.path"
-        :revision="activeTab.revision"
-        :label="t('editor.contentOf', { path: activeTab.path })"
-        @change="(text) => editor.edited(activeTab!.path, text)"
-      />
+      <template v-if="activeTab && info">
+        <MonacoEditor
+          v-if="!monacoFailed"
+          :project-root="info.root"
+          :path="activeTab.path"
+          :tabs="tabRevisions"
+          :label="t('editor.contentOf', { path: activeTab.path })"
+          @change="editor.edited"
+          @failed="onMonacoFailed"
+        />
+        <PlainEditor
+          v-else
+          :key="activeTab.path"
+          :path="activeTab.path"
+          :revision="activeTab.revision"
+          :label="t('editor.contentOf', { path: activeTab.path })"
+          @change="editor.edited"
+        />
+      </template>
       <p v-else class="empty">{{ t("editor.empty") }}</p>
     </div>
   </section>

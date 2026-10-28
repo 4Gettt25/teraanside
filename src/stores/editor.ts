@@ -44,8 +44,8 @@ export const useEditorStore = defineStore("editor", () => {
     }
   }
 
-  function edited(path: string, text: string): void {
-    setBuffer(path, text);
+  /** Called by the editor components; the buffer itself is kept by them. */
+  function edited(path: string): void {
     dispatch({ type: "edited", path });
   }
 
@@ -88,6 +88,8 @@ export const useEditorStore = defineStore("editor", () => {
     state.value = initialEditorState;
   }
 
+  const anyDirty = computed(() => state.value.tabs.some((t) => t.dirty));
+
   async function handleExternalChange(paths: string[]): Promise<void> {
     const id = projectId();
     if (id === null) return;
@@ -110,6 +112,7 @@ export const useEditorStore = defineStore("editor", () => {
     state,
     error,
     activeTab,
+    anyDirty,
     open,
     edited,
     save,

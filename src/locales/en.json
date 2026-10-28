@@ -72,7 +72,8 @@
     "reload": "Load from disk",
     "overwrite": "Keep mine and overwrite",
     "contentOf": "Content of {path}",
-    "empty": "Select a file in the explorer."
+    "empty": "Select a file in the explorer.",
+    "fallback": "The code editor could not be loaded; using a plain text editor without highlighting."
   },
   "trust": {
     "title": "Do you trust the project “{name}”?",
