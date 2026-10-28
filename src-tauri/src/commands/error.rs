@@ -1,9 +1,11 @@
 use serde::Serialize;
+use ts_rs::TS;
 
 use crate::core::CoreError;
 
 /// Structured error returned to the frontend by every command.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+#[ts(export)]
 pub struct CommandError {
     /// Stable, machine-readable error code (e.g. `invalid_input`).
     pub code: String,

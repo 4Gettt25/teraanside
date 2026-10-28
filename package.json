@@ -16,7 +16,8 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "typecheck": "vue-tsc --noEmit && vue-tsc --noEmit -p tsconfig.node.json",
-    "test": "vitest run"
+    "test": "vitest run",
+    "gen:types": "scripts/gen-types.sh"
   },
   "dependencies": {
     "@tauri-apps/api": "2.12.4",
