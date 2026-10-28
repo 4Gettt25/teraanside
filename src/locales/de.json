@@ -25,5 +25,72 @@
       "finished": "Fertig",
       "error": "Fehlgeschlagen"
     }
+  },
+  "welcome": {
+    "intro": "Öffne ein Terraform/OpenTofu- oder Ansible-Repository, um zu beginnen.",
+    "open": "Ordner öffnen…",
+    "dialogTitle": "Projektordner öffnen",
+    "shortcut": "Tastenkürzel: Strg+O",
+    "recent": "Zuletzt geöffnet",
+    "missing": "Ordner existiert nicht mehr",
+    "diagnostics": "Diagnose"
+  },
+  "toolbar": {
+    "open": "Öffnen…",
+    "close": "Projekt schließen"
+  },
+  "explorer": {
+    "title": "Projekt-Explorer"
+  },
+  "kind": {
+    "directory": "Ordner",
+    "file": "Datei",
+    "symlink": "symbolischer Link (wird nicht verfolgt)",
+    "terraformRoot": "Terraform-Root-Modul",
+    "terraformModule": "Terraform-Modul",
+    "terraformFile": "Terraform-Datei",
+    "terraformVars": "Terraform-Variablendatei",
+    "terraformLock": "Terraform-Lock-Datei",
+    "ansibleConfig": "Ansible-Konfiguration",
+    "playbook": "Ansible-Playbook",
+    "rolesDir": "Ansible-Rollen",
+    "role": "Ansible-Rolle",
+    "roleSection": "Rollenbereich",
+    "inventory": "Ansible-Inventory",
+    "groupVars": "Gruppenvariablen",
+    "hostVars": "Hostvariablen",
+    "collectionRequirements": "Ansible-Collection-Anforderungen",
+    "projectConfig": "IaC-Studio-Projektkonfiguration"
+  },
+  "editor": {
+    "title": "Editor",
+    "tabs": "Geöffnete Dateien",
+    "unsaved": "(ungespeichert)",
+    "closeTab": "{name} schließen",
+    "externalChanged": "Die Datei wurde außerhalb des Editors geändert, und du hast ungespeicherte Änderungen.",
+    "externalDeleted": "Die Datei wurde außerhalb des Editors gelöscht.",
+    "reload": "Von der Platte laden",
+    "overwrite": "Meine behalten und überschreiben",
+    "contentOf": "Inhalt von {path}",
+    "empty": "Wähle links eine Datei aus."
+  },
+  "trust": {
+    "title": "Vertraust du dem Projekt „{name}“?",
+    "explanation": "Einige Funktionen führen Code aus, der aus dem Projekt selbst stammt:",
+    "risk": {
+      "terraform": "Terraform/OpenTofu lädt Provider, führt sie aus und kann local-exec-Provisioner ausführen.",
+      "ansible": "Ansible lädt Plugins, Module und Filter aus dem Projekt.",
+      "lsp": "Language Server und Linter werten Projektdateien und -konfiguration aus."
+    },
+    "restrictedInfo": "Im eingeschränkten Modus kannst du Dateien ansehen und bearbeiten; aus dem Projekt wird nichts ausgeführt. Vertrauen kannst du später über die Statusleiste erteilen.",
+    "trust": "Projekt vertrauen",
+    "openRestricted": "Eingeschränkt öffnen"
+  },
+  "status": {
+    "trusted": "Vertraut",
+    "restricted": "Eingeschränkter Modus",
+    "terraform": "Terraform",
+    "ansible": "Ansible",
+    "truncated": "Baum gekürzt (zu viele Einträge)"
   }
 }

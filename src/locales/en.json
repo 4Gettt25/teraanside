@@ -25,5 +25,72 @@
       "finished": "Finished",
       "error": "Failed"
     }
+  },
+  "welcome": {
+    "intro": "Open a Terraform/OpenTofu or Ansible repository to get started.",
+    "open": "Open folder…",
+    "dialogTitle": "Open project folder",
+    "shortcut": "Shortcut: Ctrl+O",
+    "recent": "Recent projects",
+    "missing": "Folder no longer exists",
+    "diagnostics": "Diagnostics"
+  },
+  "toolbar": {
+    "open": "Open…",
+    "close": "Close project"
+  },
+  "explorer": {
+    "title": "Project explorer"
+  },
+  "kind": {
+    "directory": "folder",
+    "file": "file",
+    "symlink": "symbolic link (not followed)",
+    "terraformRoot": "Terraform root module",
+    "terraformModule": "Terraform module",
+    "terraformFile": "Terraform file",
+    "terraformVars": "Terraform variables file",
+    "terraformLock": "Terraform dependency lock file",
+    "ansibleConfig": "Ansible configuration",
+    "playbook": "Ansible playbook",
+    "rolesDir": "Ansible roles",
+    "role": "Ansible role",
+    "roleSection": "role section",
+    "inventory": "Ansible inventory",
+    "groupVars": "group variables",
+    "hostVars": "host variables",
+    "collectionRequirements": "Ansible collection requirements",
+    "projectConfig": "IaC Studio project configuration"
+  },
+  "editor": {
+    "title": "Editor",
+    "tabs": "Open files",
+    "unsaved": "(unsaved)",
+    "closeTab": "Close {name}",
+    "externalChanged": "This file was changed outside the editor and you have unsaved changes.",
+    "externalDeleted": "This file was deleted outside the editor.",
+    "reload": "Load from disk",
+    "overwrite": "Keep mine and overwrite",
+    "contentOf": "Content of {path}",
+    "empty": "Select a file in the explorer."
+  },
+  "trust": {
+    "title": "Do you trust the project “{name}”?",
+    "explanation": "Some features run code that comes from the project itself:",
+    "risk": {
+      "terraform": "Terraform/OpenTofu downloads and runs providers and can execute local-exec provisioners.",
+      "ansible": "Ansible loads plugins, modules and filters from the project.",
+      "lsp": "Language servers and linters evaluate project files and configuration."
+    },
+    "restrictedInfo": "In restricted mode you can browse and edit files; nothing from the project is executed. You can trust the project later from the status bar.",
+    "trust": "Trust project",
+    "openRestricted": "Open in restricted mode"
+  },
+  "status": {
+    "trusted": "Trusted",
+    "restricted": "Restricted mode",
+    "terraform": "Terraform",
+    "ansible": "Ansible",
+    "truncated": "Tree truncated (too many entries)"
   }
 }

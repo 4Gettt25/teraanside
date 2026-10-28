@@ -2,6 +2,7 @@
 
 pub mod counter;
 mod error;
+pub mod frontend_log;
 pub mod ping;
 pub mod project;
 

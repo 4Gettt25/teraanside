@@ -47,6 +47,7 @@ pub fn run() {
             commands::project::project_watch,
             commands::project::file_read,
             commands::project::file_write,
+            commands::frontend_log::frontend_log,
         ])
         .run(tauri::generate_context!())
     {

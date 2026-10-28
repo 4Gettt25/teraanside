@@ -22,7 +22,9 @@ pub enum TerraformFlavor {
 #[serde(default, rename_all = "kebab-case")]
 #[ts(export, optional_fields)]
 pub struct TerraformConfig {
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub flavor: Option<TerraformFlavor>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub version: Option<String>,
 }
 
@@ -30,7 +32,9 @@ pub struct TerraformConfig {
 #[serde(default, rename_all = "kebab-case")]
 #[ts(export, optional_fields)]
 pub struct AnsibleConfig {
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub core_version: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub lint_version: Option<String>,
 }
 
@@ -96,6 +100,14 @@ future-key = true
         assert_eq!(c.terraform.flavor, Some(TerraformFlavor::Opentofu));
         assert_eq!(c.terraform.version.as_deref(), Some("1.13.2"));
         assert_eq!(c.ansible.core_version.as_deref(), Some("2.21.5"));
+    }
+
+    #[test]
+    fn none_fields_are_omitted_in_json() {
+        // TS type uses optional fields (`flavor?: …`), so `null` must not be sent.
+        let json = serde_json::to_value(ProjectConfig::default()).unwrap();
+        assert_eq!(json["terraform"], serde_json::json!({}));
+        assert_eq!(json["ansible"], serde_json::json!({}));
     }
 
     #[test]
