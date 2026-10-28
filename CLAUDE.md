@@ -21,6 +21,7 @@ Voraussetzungen (Linux/Arch): Rust 1.97.1 (`rust-toolchain.toml`), Node ≥ 26, 
 ```bash
 pnpm install                 # Frontend-Abhängigkeiten (Lockfile: pnpm-lock.yaml)
 pnpm tauri dev               # App im Entwicklungsmodus (Vite auf :1420 + Rust-Core)
+src-tauri/target/debug/iac-studio <ORDNER> [DATEI]   # gebaute App direkt mit Projekt/Datei öffnen (nach `pnpm tauri build --debug --no-bundle`)
 RUST_LOG=info,iac_studio_lib=debug pnpm tauri dev   # mit Debug-Logs des Cores
 scripts/check.sh             # komplettes Qualitätsgate (lokal und in CI)
 scripts/check-crate-age.py origin/main   # Versionsregel für neue/geänderte Crates (braucht Netz; läuft in CI)
