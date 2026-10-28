@@ -1,0 +1,2 @@
+# Security-fix exceptions to the 14-day rule (CLAUDE.md "Versionsregel").
+# Format: name@version  # link to advisory/CVE

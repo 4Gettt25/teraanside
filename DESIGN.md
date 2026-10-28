@@ -350,6 +350,7 @@ Geplanter Windows-Ansatz (später zu validieren):
 | 11 | TypeScript-Version | TypeScript 7 ist erschienen, `typescript-eslint` 8.x unterstützt aber nur `<6.1`. Deshalb TS 6.0.3 gepinnt; Upgrade, sobald `typescript-eslint` TS 7 unterstützt. |
 | 12 | CI-Plattform | Repo liegt auf GitHub → GitHub Actions (`.github/workflows/ci.yml`) statt GitLab CI. Die Logik steckt in `scripts/check.sh`, ein Wechsel ist billig. |
 | 13 | Windows-Port: `platform`-Modul | `platform/mod.rs` bricht auf Nicht-Linux-Zielen absichtlich mit `compile_error!` ab. Beim Windows-Port durch eine `windows.rs`-Implementierung ersetzen (Trait `Platform` ist dafür ausgelegt). |
+| 14 | uv: Herkunftsnachweis über SHA256 hinaus (Folgeaufgabe) | M1 prüft uv gegen einen **pro gepinnter Version fest in der App hinterlegten SHA256**. Geprüft am 2026-10-28: Astral veröffentlicht für Release-Assets **GitHub-Attestations** (für `uv-x86_64-unknown-linux-gnu.tar.gz` 0.13.6: SLSA Provenance v1 aus `astral-sh/uv` `.github/workflows/release.yml` und eine in-toto-Release-Attestation, abrufbar über `GET /repos/astral-sh/uv/attestations/sha256:<digest>`). Folgeaufgabe nach M1: Sigstore-Bundle-Prüfung (Zertifikatsidentität = Release-Workflow von `astral-sh/uv`) im Toolchain-Manager ergänzen, Crate-Wahl dann bewerten. |
 
 ### 14.1 Spike #2: Node-Bedarf von `ansible-language-server` (M1)
 

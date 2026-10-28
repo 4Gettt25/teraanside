@@ -23,6 +23,7 @@ pnpm install                 # Frontend-Abhängigkeiten (Lockfile: pnpm-lock.yam
 pnpm tauri dev               # App im Entwicklungsmodus (Vite auf :1420 + Rust-Core)
 RUST_LOG=info,iac_studio_lib=debug pnpm tauri dev   # mit Debug-Logs des Cores
 scripts/check.sh             # komplettes Qualitätsgate (lokal und in CI)
+scripts/check-crate-age.py origin/main   # Versionsregel für neue/geänderte Crates (braucht Netz; läuft in CI)
 pnpm gen:types               # TS-Typen aus Rust neu erzeugen -> src/lib/generated/ (committen!)
 pnpm lint                    # ESLint (vue + typescript-eslint strictTypeChecked)
 pnpm format                  # Prettier schreiben; pnpm format:check prüft nur
@@ -59,6 +60,11 @@ DESIGN.md  CLAUDE.md
 ```
 
 ## Konventionen
+
+### Abhängigkeiten
+- Versionsregel: Neue Abhängigkeiten und Updates nur auf Versionen, die seit mindestens 14 Tagen veröffentlicht sind. Ausnahme: Sicherheitsfix für eine nachweislich betroffene Version (Advisory/CVE im Commit verlinken). Lockfiles (Cargo.lock, pnpm-lock.yaml) werden committet, CI installiert mit --locked bzw. --frozen-lockfile.
+- Durchsetzung npm: `pnpm-workspace.yaml` setzt `minimumReleaseAge: 20160` (strikt, auch transitiv, Lockfile wird bei jedem Install geprüft). Sicherheitsausnahmen als exakte Version in `minimumReleaseAgeExclude` mit Link als Kommentar.
+- Durchsetzung Rust: Cargo hat keine entsprechende Einstellung; CI führt `scripts/check-crate-age.py <base>` aus (prüft neue/geänderte `Cargo.lock`-Einträge gegen crates.io). Ausnahmen in `supply-chain/crate-age-exceptions.txt` mit Link.
 
 ### Rust
 - Edition aktuell, `#![forbid(unsafe_code)]` außer es gibt eine dokumentierte Ausnahme.

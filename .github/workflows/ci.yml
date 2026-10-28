@@ -14,6 +14,17 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0 # needed to diff Cargo.lock against the base commit
+
+      - name: Versionsregel for crates (new/changed Cargo.lock entries >= 14 days)
+        env:
+          BASE: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          if ! git cat-file -e "${BASE}^{commit}" 2>/dev/null; then
+            BASE=$(git merge-base HEAD origin/main)
+          fi
+          python3 -I scripts/check-crate-age.py "$BASE"
 
       - name: Install Tauri system dependencies
         run: |
