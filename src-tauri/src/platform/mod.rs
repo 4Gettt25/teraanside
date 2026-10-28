@@ -31,6 +31,8 @@ pub trait Platform: Send + Sync {
     fn os(&self) -> &'static str;
     /// Application directories (config, data, cache, state).
     fn app_dirs(&self) -> Result<AppDirs, PlatformError>;
+    /// Permissions for newly created user files (e.g. a new file saved from the editor).
+    fn new_file_permissions(&self) -> cap_std::fs::Permissions;
 }
 
 /// The platform implementation for the current target.

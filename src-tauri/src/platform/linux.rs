@@ -14,6 +14,11 @@ impl Platform for LinuxPlatform {
     fn app_dirs(&self) -> Result<AppDirs, PlatformError> {
         app_dirs_from_env(|key| std::env::var(key).ok())
     }
+
+    fn new_file_permissions(&self) -> cap_std::fs::Permissions {
+        use std::os::unix::fs::PermissionsExt;
+        cap_std::fs::Permissions::from_std(std::fs::Permissions::from_mode(0o644))
+    }
 }
 
 /// Resolves the XDG base directories (XDG Base Directory Specification):

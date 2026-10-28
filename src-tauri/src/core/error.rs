@@ -1,5 +1,6 @@
 use thiserror::Error;
 
+use crate::core::project::ProjectError;
 use crate::platform::PlatformError;
 
 /// Errors produced by the core. Converted to `CommandError` at the command boundary.
@@ -11,6 +12,8 @@ pub enum CoreError {
     StreamClosed,
     #[error(transparent)]
     Platform(#[from] PlatformError),
+    #[error(transparent)]
+    Project(#[from] ProjectError),
 }
 
 impl CoreError {
@@ -19,6 +22,7 @@ impl CoreError {
             Self::InvalidInput(_) => "invalid_input",
             Self::StreamClosed => "stream_closed",
             Self::Platform(_) => "platform",
+            Self::Project(e) => e.code(),
         }
     }
 
@@ -28,6 +32,7 @@ impl CoreError {
             Self::Platform(PlatformError::NoHomeDir) => {
                 Some("Set the HOME environment variable or the XDG base directory variables.")
             }
+            Self::Project(e) => e.hint(),
         }
     }
 }
