@@ -110,8 +110,30 @@ Die konkreten Versionen werden beim Scaffolding aus den aktuellen Releases besti
 
 ### 4.6 `lsp`
 - Startet `terraform-ls` und `ansible-language-server` als Kindprozess pro Workspace.
-- Brücke Monaco ↔ Language Server: stdio im Core, Nachrichten über Tauri-Channel; im Frontend ein eigener `MessageTransport` für `monaco-languageclient` (kein WebSocket-Server nötig).
+- Brücke Monaco ↔ Language Server: stdio im Core, Nachrichten über Tauri-Channel; im Frontend ein eigener `MessageTransport` für `monaco-languageclient` (kein WebSocket-Server nötig). Durch Spike M1 bestätigt (14.2).
 - Lebenszyklus: Start bei Projektöffnung (lazy bei erster passender Datei), Neustart bei Toolchain-Wechsel, sauberes Beenden.
+
+**Produktionsentwurf (aus Spike M1, vor Umsetzung freizugeben)**
+
+```
+core/lsp/
+  mod.rs        LspManager: Sessions pro (Projekt, Server-Art), Start/Stop/Restart, stop_all
+  framing.rs    Content-Length-Codec (lesen/schreiben), Größenlimit, Tests mit Fixtures
+  session.rs    eine Session: Prozess über core/runner, Reader-Task, Writer-Queue, Zustand
+  servers.rs    ServerSpec je Server: Executable aus toolchain, Argumente, Env-Allowlist,
+                initializationOptions/Settings (ALS: interpreterPath=venv, EE immer aus)
+  error.rs      LspError → CoreError
+commands/lsp.rs lsp_start(project, kind, channel) -> SessionId, lsp_send(id, msg), lsp_stop(id)
+src/lib/lsp/    TauriMessageReader/-Writer, startClient(kind, uri) mit MonacoLanguageClient
+```
+
+- **Prozessstart nur über `core/runner`** (Executable + Argumente, Allowlist-Umgebung); `lsp` kennt keine `Command`-API.
+- **Zustände:** `Starting → Running → Stopping → Stopped | Crashed`. Events an das Frontend: `Message`, `StateChanged`, `Exited { code, stderr_tail }`.
+- **Vertrauen:** Start nur für vertrauenswürdige Projekte (terraform-ls lädt Provider-Schemata, ALS ruft `ansible-*` auf). Vorher kein Start, UI zeigt den Grund.
+- **Beenden:** Frontend ruft `client.stop()` (shutdown/exit); Core schließt danach stdin, wartet 2 s, dann SIGTERM, nach weiteren 2 s SIGKILL (über `platform`). `stop_all` bei `RunEvent::ExitRequested`. Befund 14.2/1 ist dafür maßgeblich.
+- **Fehlerfälle:** Executable fehlt → `lsp_unavailable` mit Hinweis „Toolchain einrichten“, Editor läuft ohne LSP weiter. Absturz → `Crashed` mit letzten stderr-Zeilen; automatischer Neustart höchstens 3× in 60 s, danach manuell. Framing-/JSON-Fehler → Session beenden (kein Weiterlesen im Ungewissen). Channel geschlossen (Fenster zu) → Session stoppen. Nachricht > 64 MB → Fehler statt Speicherexplosion.
+- **Logging:** Nachrichten nur auf `trace`-Level und nie mit Inhalt von Dokumenten oder Settings auf `info`; stderr der Server auf `debug`.
+- **Frontend:** Monaco und `monaco-languageclient` per dynamischem Import; eine globale `MonacoVscodeApiWrapper`-Initialisierung; ein `MonacoLanguageClient` je Session; CSP-Ergänzungen laut 14.2/3.
 
 ### 4.7 `schema`
 - Terraform: `terraform providers schema -json` → normalisiertes internes Schema (Ressourcen, Datenquellen, Attribute, Typen, required/optional/computed, Beschreibungen). Cache pro Provider-Version.
@@ -316,9 +338,9 @@ Geplanter Windows-Ansatz (später zu validieren):
 | # | Frage / Risiko | Vorgehen |
 |---|---|---|
 | 1 | `ansible-runner` vs. eigenes Callback-Plugin für Events | Spike in M3, Kriterien: Eventvollständigkeit, Stabilität, Abhängigkeitsgröße, Verhalten bei Abbruch |
-| 2 | `ansible-language-server` benötigt Node.js | Optionen: Node per App mitverwalten, Node-SEA/Bundle, oder LSP optional und nur bei vorhandenem Node. Entscheidung in M1 |
+| 2 | ~~`ansible-language-server` benötigt Node.js~~ | **Entschieden (Spike M1, 2026-10-28): Node-Laufzeit von der App verwaltet + ALS als vorgebündelte JS-Datei in der App; LSP bleibt optional.** Details und Messwerte in 14.1. |
 | 3 | Verlustfreies Schreiben aus Formularen (HCL/YAML) | Parser-Spike zu Beginn M4; Fallback: nur Einfügen neuer Blöcke und feldweises Ersetzen von Literalen |
-| 4 | `monaco-languageclient`-Transport ohne WebSocket über Tauri-Channel | Früher Mini-Spike in M1 mit `terraform-ls` |
+| 4 | ~~`monaco-languageclient`-Transport ohne WebSocket über Tauri-Channel~~ | **Entschieden (Spike M1, 2026-10-28): machbar und schnell.** Rust übernimmt stdio + Content-Length-Framing, Nachrichten gehen als JSON über `tauri::ipc::Channel` ins Frontend, Rückweg per Command; im Frontend `MonacoLanguageClient` mit eigenem `messageTransports`-Paar (`AbstractMessageReader`/`AbstractMessageWriter`). Details und Messwerte in 14.2. |
 | 5 | OpenTofu vs. Terraform: JSON-Ausgabeformate leicht unterschiedlich | Parser gegen beide testen, Fixtures für beide |
 | 6 | Lizenz/Redistribution von Terraform-Binaries (BSL) | Binaries nicht bündeln, nur vom Nutzer-Rechner aus offizieller Quelle laden |
 | 7 | Sehr große Pläne/Läufe (tausende Ressourcen/Events) | Virtualisierte Listen, Event-Batching (z. B. 50 ms), Backpressure im Channel |
@@ -328,6 +350,64 @@ Geplanter Windows-Ansatz (später zu validieren):
 | 11 | TypeScript-Version | TypeScript 7 ist erschienen, `typescript-eslint` 8.x unterstützt aber nur `<6.1`. Deshalb TS 6.0.3 gepinnt; Upgrade, sobald `typescript-eslint` TS 7 unterstützt. |
 | 12 | CI-Plattform | Repo liegt auf GitHub → GitHub Actions (`.github/workflows/ci.yml`) statt GitLab CI. Die Logik steckt in `scripts/check.sh`, ein Wechsel ist billig. |
 | 13 | Windows-Port: `platform`-Modul | `platform/mod.rs` bricht auf Nicht-Linux-Zielen absichtlich mit `compile_error!` ab. Beim Windows-Port durch eine `windows.rs`-Implementierung ersetzen (Trait `Platform` ist dafür ausgelegt). |
+
+### 14.1 Spike #2: Node-Bedarf von `ansible-language-server` (M1)
+
+**Ist-Zustand (geprüft, nicht aus dem Gedächtnis):** `@ansible/ansible-language-server` 26.6.0 (npm, Monorepo `ansible/vscode-ansible`), `engines.node >= 24.0`. Einstiegspunkt `dist/cli.cjs --stdio`. Laufzeitbedarf: `ansible` (Hover/Completion über `ansible-doc`/`ansible-config`/`ansible-inventory`), optional `ansible-lint` (sonst Fallback `ansible-playbook --syntax-check`), Python. Mit der Einstellung `ansible.python.interpreterPath = <venv>/bin/python` setzt der Server selbst `VIRTUAL_ENV` und stellt `<venv>/bin` vor `PATH` – die uv-venv aus der Toolchain reicht, nichts muss global installiert sein. Unterprozesse startet er mit `shell: false`; **nur** der Execution-Environment-Pfad nutzt `execSync` mit Shell-Strings (Container-Pull) → `ansible.executionEnvironment.enabled` muss bei uns immer `false` sein.
+
+**Real getestet** (Arch, uv 0.13.6, venv mit ansible-core 2.21.5 + ansible-lint 26.10.1, Beispiel-Playbook):
+
+| Variante | initialize | erste Diagnostics (ansible-lint) | Hover (`ansible.builtin.package`) | Beenden |
+|---|---|---|---|---|
+| npm-Paket, System-Node 26.12 | 121 ms | 1,5 s, 4 Befunde | 596 ms, Moduldoku | shutdown/exit → 0 |
+| npm-Paket, offizielles Node 24.22.2 | 73 ms | 1,3 s | 603 ms | 0 |
+| **esbuild-Bundle (1 Datei, 0,8 MB) + offizielles Node 24, ohne Netz (`unshare -rn`)** | **73–76 ms** (warm) | **1,6 s** | **628 ms** | **0** |
+| Node-SEA (Bundle in `node --build-sea`) | 70 ms | 1,3 s | 602 ms | 0 |
+
+Beenden: `shutdown`+`exit` → Exit 0 nach 8 ms; nur stdin-EOF → Exit 1 nach 9 ms; SIGTERM → 8 ms. Speicher nach `initialize`: ~67 MB RSS. Offline voll funktionsfähig (kein Netzzugriff nötig, solange Execution Environments aus sind).
+
+**Bewertung**
+
+| Kriterium | A: Node von der App verwalten (+ ALS-Bundle in der App) | B: Node-SEA / eigenes Binary | C: nur mit vorhandenem System-Node ≥ 24 |
+|---|---|---|---|
+| Installationsgröße | Download 32 MB (`node-v24…-linux-x64.tar.xz`), davon nur `bin/node` behalten: 121 MB; ALS-Bundle 0,8 MB in der App | 67 MB mit Arch-Node (dynamisch gegen Systembibliotheken gelinkt, **nicht portabel**); portabel nur mit offiziellem Node-Binary als Basis ≈ 128 MB (127 MB Binary + Bundle) | 0 MB + 0,8 MB Bundle |
+| Wartung | Node-LTS-Pin + SHASUMS256-Prüfung (gleiches Muster wie Terraform); ALS-Bundle-Update = App-Release mit Tests | Eigene Build-Pipeline pro Node-Patch **und** ALS-Release; wir müssten ein 128-MB-Binary hosten und signieren | minimal, aber keine Kontrolle über Node-Version |
+| Ohne Netz | nach einmaligem Download voll offline; ohne Download kein ALS (Editor geht trotzdem) | offline, wenn mitgeliefert (dann App +128 MB) | offline, wenn Node da ist |
+| Updatefähigkeit | Node-Sicherheitsupdates unabhängig vom App-Release (Toolchain-Manager) | nur über neue App-/Binary-Releases | vom Nutzer/der Distribution abhängig |
+| Nutzererlebnis | ein Schritt mehr im Einrichtungsassistenten, sonst unsichtbar | unsichtbar, aber große App bzw. eigener Download | Funktion fehlt still, wenn Node fehlt oder < 24 ist |
+
+**Entscheidung: A.** Die Toolchain verwaltet eine Node-LTS-Laufzeit (aktuell 24.x, Mindestversion laut `engines`), geladen von `nodejs.org` mit SHASUMS256- (und Signatur-)Prüfung, entpackt wird nur `bin/node`. `ansible-language-server` wird zur Build-Zeit mit esbuild zu **einer** Datei gebündelt (Version gepinnt, Lizenzhinweise per `--legal-comments=external` mitliefern) und als App-Ressource ausgeliefert – zur Laufzeit kein `npm`, keine Registry. B bringt keinen Größenvorteil (die SEA enthält das komplette Node-Binary), koppelt aber jedes Node-Sicherheitsupdate an unsere Releases. C wäre das schlechteste Nutzererlebnis. **LSP bleibt optional:** Fehlt Node (offline beim ersten Start, Download abgelehnt), funktioniert der Ansible-Editor ohne Completion/Diagnostics, und die UI zeigt den Grund mit „Einrichten“-Aktion.
+
+Windows-Hinweis (Abschnitt 13): Unter Windows läuft ALS im WSL-Distro; A überträgt sich direkt (Linux-Node im Distro), die Entscheidung erschwert den Port nicht.
+
+### 14.2 Spike #4: Transport Monaco ↔ Language Server ohne WebSocket (M1)
+
+**Bibliotheksstand (aus Paket und Doku geprüft):** `monaco-languageclient` 11.0.3 setzt auf `@codingame/monaco-vscode-api` 37.6.x. Die High-Level-`LanguageClientWrapper`-Konfiguration kennt nur die Familien `WebSocket` und `Worker`; der Paketeinstieg exportiert aber `MonacoLanguageClient({ name, clientOptions, messageTransports })`. Ein eigener Transport ist daher ein Paar aus `AbstractMessageReader`/`AbstractMessageWriter` (`vscode-languageserver-protocol/browser`, gleiche Version wie im Client) – keine Interna, kein Fork.
+
+**Prototyp:** Rust startet `terraform-ls serve` (0.39.1, Download von `releases.hashicorp.com` mit SHA256SUMS-Prüfung) per `tokio::process` mit Allowlist-Umgebung, liest stdout mit Content-Length-Framing, parst JSON und sendet `{type: "message", payload}` bzw. `{type: "exited"}` über `tauri::ipc::Channel`; der Rückweg ist ein Command (`lsp_send(id, message)`), Rust rahmt und schreibt nach stdin. Im Frontend puffert der Reader Nachrichten bis `listen()`.
+
+**Messwerte** (gleiche `main.tf` mit null-Provider und einem unbekannten Attribut; terraform-ls direkt per stdio zum Vergleich):
+
+| | direkt stdio (Python-Harness) | Tauri-Channel, Vite-Dev (warm) | Tauri-Channel, gebaute App |
+|---|---|---|---|
+| Prozessstart (spawn) | – | < 1 ms (kalt 25 ms) | < 1 ms |
+| `initialize`-Roundtrip | 111 ms | 120–142 ms | **54–69 ms** |
+| erste Server-Nachricht nach Start | – | 189–193 ms | 96–99 ms |
+| Diagnostics | 64 ms nach `didOpen` | da (L19 „Unexpected attribute“) | da |
+| Completion im `resource`-Block | 5 ms, 7 Einträge | 64–69 ms | **28–42 ms**, 7 Einträge |
+| Server→Client→Server-Roundtrip (`client/registerCapability`) | – | 24 ms | – |
+| Beenden beim Fensterschließen | – | – | Server Exit 0 nach ~6 ms, App Exit 0, kein Restprozess |
+
+Kalt (erster Vite-Lauf, Abhängigkeiten werden optimiert) lag `initialize` bei 3,8 s – ein reiner Dev-Server-Effekt. Der Overhead des Transports bleibt im Bereich weniger Millisekunden pro Nachricht; spürbar ist v. a. die Initialisierung der VS-Code-Dienste (240–350 ms bis `apiWrapper.start()`).
+
+**Befunde, die den Produktionscode bestimmen**
+1. **terraform-ls beendet sich nach `shutdown`/`exit` nicht, solange stdin offen ist** (> 5 s gemessen); mit stdin-EOF oder SIGTERM nach 4 ms, Exit 0. Der Core muss nach `exit` stdin schließen und mit Timeout warten, danach SIGTERM → SIGKILL.
+2. Wird die App per SIGKILL beendet, bekommen die Server über die geschlossene Pipe EOF und beenden sich (geprüft, kein Waisenprozess). `kill_on_drop` deckt das reguläre Beenden zusätzlich ab.
+3. **CSP:** `monaco-vscode-api` braucht `worker-src 'self' blob:`, `connect-src` mit `'self' blob: data:` (Themes/Extension-Dateien) sowie `font-src`/`img-src` mit `data:`. Mit unserer M0-CSP schlugen Theme-Laden und Worker-Start fehl. Kein Remote-Origin nötig.
+4. Bundle: Frontend-Assets steigen von 62 KB (M0) auf 15,8 MB (4,4 MB gzip), 79 Dateien. Monaco/VS-Code-Dienste per dynamischem Import erst beim ersten Öffnen einer Datei laden.
+5. Speicher: terraform-ls ~19 MB RSS nach `initialize`.
+
+**Entscheidung:** Transport wie im Prototyp, kein WebSocket-Server, kein Worker. Produktionsentwurf siehe 4.6.
 
 ---
 
