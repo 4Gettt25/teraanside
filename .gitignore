@@ -18,3 +18,5 @@ src-tauri/gen/schemas/
 
 # Local IaC Studio run history (never commit)
 .iac-studio/runs/
+dist-ssr/
+*.local
