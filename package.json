@@ -20,9 +20,15 @@
     "gen:types": "scripts/gen-types.sh"
   },
   "dependencies": {
+    "@codingame/monaco-vscode-api": "37.6.1",
+    "@codingame/monaco-vscode-files-service-override": "37.6.1",
     "@tauri-apps/api": "2.12.4",
     "@vue/devtools-api": "8.2.1",
+    "monaco-languageclient": "11.0.3",
     "pinia": "4.1.0",
+    "vscode": "npm:@codingame/monaco-vscode-extension-api@37.6.1",
+    "vscode-languageclient": "10.1.2",
+    "vscode-languageserver-protocol": "3.18.4",
     "vue": "3.5.44",
     "vue-i18n": "11.4.16"
   },

@@ -5,7 +5,7 @@ import prettier from "eslint-config-prettier";
 
 export default defineConfigWithVueTs(
   {
-    ignores: ["dist/**", "src-tauri/**", "node_modules/**", "src/lib/generated/**"],
+    ignores: ["dist/**", "src-tauri/**", "node_modules/**", "src/lib/generated/**", "src/spike/**"],
   },
   pluginVue.configs["flat/recommended"],
   vueTsConfigs.strictTypeChecked,

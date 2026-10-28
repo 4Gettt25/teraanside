@@ -1,0 +1,18 @@
+---
+- name: Configure web servers
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - name: Install nginx
+      ansible.builtin.package:
+        name: nginx
+        state: present
+        bogus_option: true
+
+    - name: Copy config
+      ansible.builtin.copy:
+        src: nginx.conf
+        dest: /etc/nginx/nginx.conf
+        mode: "0644"
+
+    - shell: echo hello

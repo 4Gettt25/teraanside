@@ -7,6 +7,9 @@ const host = process.env.TAURI_DEV_HOST;
 // https://vite.dev/config/
 export default defineConfig(() => ({
   plugins: [vue()],
+  // SPIKE: required by monaco-languageclient docs (single `vscode` instance)
+  resolve: { dedupe: ["vscode"] },
+  worker: { format: "es" as const },
 
   // Options tailored for `tauri dev` / `tauri build`:
   // 1. prevent Vite from obscuring Rust errors

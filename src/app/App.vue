@@ -2,6 +2,7 @@
 import { useI18n } from "vue-i18n";
 import CounterPanel from "../features/diagnostics/CounterPanel.vue";
 import PingPanel from "../features/diagnostics/PingPanel.vue";
+import LspSpike from "../spike/LspSpike.vue";
 
 const { t } = useI18n();
 </script>
@@ -14,6 +15,7 @@ const { t } = useI18n();
     </header>
     <PingPanel />
     <CounterPanel />
+    <LspSpike />
   </main>
 </template>
 
@@ -24,7 +26,7 @@ const { t } = useI18n();
   background: #fff;
 }
 main {
-  max-width: 48rem;
+  max-width: 64rem;
   margin: 0 auto;
   padding: 1rem;
 }
