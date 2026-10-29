@@ -181,7 +181,13 @@ pub fn validate_relative(rel: &str) -> Result<Utf8PathBuf, ProjectError> {
 }
 
 pub fn hex_sha256(bytes: &[u8]) -> String {
-    Sha256::digest(bytes)
+    hex_sha256_digest(Sha256::new_with_prefix(bytes))
+}
+
+/// Finalizes an incremental SHA256 as lower-case hex.
+pub fn hex_sha256_digest(hasher: Sha256) -> String {
+    hasher
+        .finalize()
         .iter()
         .map(|b| format!("{b:02x}"))
         .collect()

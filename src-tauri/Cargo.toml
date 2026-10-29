@@ -31,12 +31,17 @@ toml = "=1.1.8"
 tauri-plugin-dialog = "=2.8.3"
 notify = { version = "=8.2.0", default-features = false }
 pgp = { version = "=0.21.0", default-features = false }
+reqwest = { version = "=0.13.5", default-features = false, features = ["rustls", "http2"] }
+zip = { version = "=9.0.3", default-features = false, features = ["deflate-flate2-zlib-rs"] }
+flate2 = "=1.1.10"
+tar = { version = "=0.4.46", default-features = false }
 
 [target.'cfg(unix)'.dependencies]
 rustix = { version = "=1.1.5", features = ["process"] }
 tokio = { version = "=1.54.1", features = ["time", "sync", "process", "io-util", "rt", "macros"] }
 
 [dev-dependencies]
+wiremock = "=0.6.5"
 tempfile = "=3.27.0"
 tokio = { version = "=1.54.1", features = ["macros", "rt", "time", "test-util"] }
 

@@ -4,6 +4,8 @@
 
 pub mod catalog;
 pub mod checksums;
+pub mod download;
+pub mod install;
 pub mod keys;
 pub mod signature;
 pub mod version;
@@ -22,6 +24,29 @@ pub enum ToolchainError {
     Signature(String),
     #[error("checksum problem: {0}")]
     Checksum(String),
+    #[error("download source not allowed: {0}")]
+    NotAllowed(String),
+    #[error("download failed: {0}")]
+    Download(String),
+    #[error("download is larger than the allowed {limit} bytes")]
+    TooLarge { limit: u64 },
+    #[error("cancelled")]
+    Cancelled,
+    #[error("archive problem: {0}")]
+    Archive(String),
+    #[error("i/o error ({context}): {source}")]
+    Io {
+        context: String,
+        #[source]
+        source: std::io::Error,
+    },
+}
+
+impl ToolchainError {
+    pub(crate) fn io(context: impl Into<String>) -> impl FnOnce(std::io::Error) -> Self {
+        let context = context.into();
+        move |source| Self::Io { context, source }
+    }
 }
 
 impl ToolchainError {
@@ -32,6 +57,12 @@ impl ToolchainError {
             Self::Key(_) => "signing_key",
             Self::Signature(_) => "signature",
             Self::Checksum(_) => "checksum",
+            Self::NotAllowed(_) => "download_not_allowed",
+            Self::Download(_) => "download_failed",
+            Self::TooLarge { .. } => "download_too_large",
+            Self::Cancelled => "cancelled",
+            Self::Archive(_) => "archive",
+            Self::Io { .. } => "io",
         }
     }
 
@@ -40,6 +71,10 @@ impl ToolchainError {
             Self::Signature(_) | Self::Checksum(_) => Some(
                 "The download did not match the vendor's signed checksums and was discarded. \
                  Retry later; if it persists, report it.",
+            ),
+            Self::Download(_) => Some(
+                "Check the network connection or proxy settings (HTTPS_PROXY). Already \
+                 installed versions keep working offline.",
             ),
             _ => None,
         }

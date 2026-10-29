@@ -1,2 +1,4 @@
 # Security-fix exceptions to the 14-day rule (CLAUDE.md "Versionsregel").
 # Format: name@version  # link to advisory/CVE
+rustls-webpki@0.103.16  # RUSTSEC-2026-0382 / CVE-2026-111943, distrusted intermediates accepted; first patched 0.103.x: https://rustsec.org/advisories/RUSTSEC-2026-0382.html
+webpki-root-certs@1.0.10  # RUSTSEC-2026-0383 / CVE-2026-111943, distrusted emSign intermediates; first patched: https://rustsec.org/advisories/RUSTSEC-2026-0383.html
