@@ -47,6 +47,64 @@ impl Platform for LinuxPlatform {
         }
         result
     }
+
+    fn env_allowlist(&self) -> &'static [&'static str] {
+        &[
+            "HOME",
+            "USER",
+            "LOGNAME",
+            "PATH",
+            "LANG",
+            "LANGUAGE",
+            "TZ",
+            "TMPDIR",
+            // ssh-agent for git/ansible connections
+            "SSH_AUTH_SOCK",
+            // corporate proxies (terraform init, uv, ansible-galaxy)
+            "HTTP_PROXY",
+            "HTTPS_PROXY",
+            "NO_PROXY",
+            "http_proxy",
+            "https_proxy",
+            "no_proxy",
+        ]
+    }
+
+    fn env_allowlist_prefixes(&self) -> &'static [&'static str] {
+        &["LC_"]
+    }
+
+    fn path_list_separator(&self) -> &'static str {
+        ":"
+    }
+
+    fn prepare_command(&self, command: &mut tokio::process::Command) {
+        command.process_group(0);
+    }
+
+    fn signal_process_tree(&self, pid: u32, signal: super::ProcessSignal) -> std::io::Result<()> {
+        use rustix::process::{Pid, Signal, kill_process_group};
+        let raw = i32::try_from(pid).map_err(|_| std::io::Error::other("pid out of range"))?;
+        let pid = Pid::from_raw(raw).ok_or_else(|| std::io::Error::other("invalid pid 0"))?;
+        let signal = match signal {
+            super::ProcessSignal::Interrupt => Signal::INT,
+            super::ProcessSignal::Terminate => Signal::TERM,
+            super::ProcessSignal::Kill => Signal::KILL,
+        };
+        kill_process_group(pid, signal).map_err(std::io::Error::from)
+    }
+
+    fn termination_signal(&self, status: &std::process::ExitStatus) -> Option<i32> {
+        use std::os::unix::process::ExitStatusExt;
+        status.signal()
+    }
+
+    fn make_executable(&self, path: &camino::Utf8Path) -> std::io::Result<()> {
+        use std::os::unix::fs::PermissionsExt;
+        let mut perms = std::fs::metadata(path)?.permissions();
+        perms.set_mode(perms.mode() | 0o700);
+        std::fs::set_permissions(path, perms)
+    }
 }
 
 /// Resolves the XDG base directories (XDG Base Directory Specification):
