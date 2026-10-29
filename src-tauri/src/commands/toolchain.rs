@@ -15,7 +15,15 @@ fn status_of(ws: &Workspace, tc: &Toolchain, id: ProjectId) -> Result<ToolchainS
     let project = entry.project();
     project.reload_config()?;
     let detected = tree::build_tree(project.fs(), project.name())?.detected;
-    Ok(tc.status(project, detected))
+    let status = tc.status(project, detected);
+    tracing::debug!(
+        id,
+        ready = status.ready,
+        needs_flavor_choice = status.needs_flavor_choice,
+        tools = status.tools.len(),
+        "toolchain status"
+    );
+    Ok(status)
 }
 
 #[tauri::command]

@@ -93,5 +93,58 @@
     "terraform": "Terraform",
     "ansible": "Ansible",
     "truncated": "Tree truncated (too many entries)"
+  },
+  "tool": {
+    "terraform": "Terraform",
+    "opentofu": "OpenTofu",
+    "terraformLs": "terraform-ls (language server)",
+    "uv": "uv (Python manager)",
+    "node": "Node.js (for the Ansible language server)"
+  },
+  "pinSource": {
+    "projectToml": "pinned in project.toml",
+    "toolVersions": "from .tool-versions",
+    "versionFile": "from version file",
+    "default": "app default"
+  },
+  "toolchain": {
+    "title": "Set up tools",
+    "intro": "IaC Studio installs the tools this project needs into its own directory. Downloads come only from the official sources and are verified before use.",
+    "flavorQuestion": "Which tool should this project use?",
+    "flavorOpentofu": "open source (MPL-2.0), community-governed fork",
+    "flavorTerraform": "by HashiCorp (Business Source License)",
+    "flavorNote": "Your choice is saved as a pin in .iac-studio/project.toml so the whole team uses the same tool and version.",
+    "flavorConfirm": "Save choice",
+    "required": "Required tools",
+    "installed": "installed",
+    "missing": "not installed",
+    "ansibleEnv": "Ansible environment",
+    "envVersions": "ansible-core {core}, ansible-lint {lint}, Python {python}",
+    "ready": "All tools are ready.",
+    "installTool": "Install {tool} {version}",
+    "createEnv": "Create Ansible environment (ansible-core {core}, ansible-lint {lint}, Python {python})",
+    "step": {
+      "pending": "waiting",
+      "running": "running",
+      "done": "done",
+      "failed": "failed"
+    },
+    "phase": {
+      "verifying": "Verifying signature…",
+      "downloading": "Downloading",
+      "extracting": "Unpacking",
+      "done": "Done"
+    },
+    "log": "Output",
+    "done": "Setup complete.",
+    "cancelled": "Setup cancelled.",
+    "failed": "Setup failed. Already installed tools are kept.",
+    "cancel": "Cancel",
+    "close": "Close",
+    "start": "Set up",
+    "retry": "Try again",
+    "statusReady": "Tools ready",
+    "statusMissing": "Tools missing",
+    "open": "Set up tools"
   }
 }

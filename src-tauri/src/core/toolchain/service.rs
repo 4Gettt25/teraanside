@@ -540,4 +540,58 @@ mod tests {
         assert_eq!(reread, cfg);
         assert_eq!(f.project.config(), cfg, "in-memory config is refreshed");
     }
+
+    /// Full setup against the real sources (network, ~600 MB incl. Python).
+    /// Run manually: `cargo test real_setup -- --ignored --nocapture`
+    #[tokio::test]
+    #[ignore = "network: installs all tools and a real ansible venv"]
+    #[allow(clippy::print_stderr)] // manual run: report the event flow
+    async fn real_setup_of_mixed_project() {
+        let f = fx(&[
+            ("main.tf", "resource \"null_resource\" \"x\" {}\n"),
+            ("ansible.cfg", "[defaults]\n"),
+        ]);
+        let tc = Toolchain::new(f.dirs.clone()).unwrap();
+        let s = tc.status(&f.project, BOTH);
+        assert!(s.needs_flavor_choice);
+        tc.choose_flavor(&f.project, TerraformFlavor::Opentofu)
+            .unwrap();
+        let s = tc.status(&f.project, BOTH);
+        let started = std::time::Instant::now();
+        let events = std::sync::Mutex::new(Vec::new());
+        tc.setup(&f.project, &s, |e| {
+            if !matches!(e, SetupEvent::Progress { .. } | SetupEvent::Log { .. }) {
+                eprintln!("{:>6.1}s {e:?}", started.elapsed().as_secs_f32());
+            }
+            events.lock().unwrap().push(e);
+        })
+        .await
+        .unwrap();
+        let events = events.into_inner().unwrap();
+        assert!(
+            matches!(
+                events.last(),
+                Some(SetupEvent::Finished {
+                    ok: true,
+                    cancelled: false
+                })
+            ),
+            "{:?}",
+            events.last()
+        );
+        let after = tc.status(&f.project, BOTH);
+        assert!(after.ready, "{after:?}");
+        let venv = ansible_env::venv_dir(&f.dirs.data, f.project.root());
+        let out = std::process::Command::new(venv.join("bin/ansible").as_std_path())
+            .arg("--version")
+            .output()
+            .unwrap();
+        let first = String::from_utf8_lossy(&out.stdout)
+            .lines()
+            .next()
+            .unwrap_or("")
+            .to_owned();
+        eprintln!("venv: {first}");
+        assert!(first.contains(defaults::ANSIBLE_CORE), "{first}");
+    }
 }

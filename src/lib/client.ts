@@ -13,6 +13,9 @@ import type { ProjectEvent } from "./generated/ProjectEvent";
 import type { ProjectInfo } from "./generated/ProjectInfo";
 import type { ProjectTree } from "./generated/ProjectTree";
 import type { RecentProject } from "./generated/RecentProject";
+import type { SetupEvent } from "./generated/SetupEvent";
+import type { TerraformFlavor } from "./generated/TerraformFlavor";
+import type { ToolchainStatus } from "./generated/ToolchainStatus";
 
 export type {
   CounterEvent,
@@ -24,6 +27,9 @@ export type {
   ProjectInfo,
   ProjectTree,
   RecentProject,
+  SetupEvent,
+  TerraformFlavor,
+  ToolchainStatus,
 };
 
 async function call<T>(command: string, args: Record<string, unknown>): Promise<T> {
@@ -103,4 +109,31 @@ export function fileWrite(
 /** Reports an uncaught frontend error to the core log; never throws. */
 export function reportFrontendError(message: string): void {
   invoke("frontend_log", { message }).catch(() => undefined);
+}
+
+export function toolchainStatus(id: number): Promise<ToolchainStatus> {
+  return call<ToolchainStatus>("toolchain_status", { id });
+}
+
+/** Writes the choice as pin into `.iac-studio/project.toml`. */
+export function toolchainChooseFlavor(
+  id: number,
+  flavor: TerraformFlavor,
+): Promise<ToolchainStatus> {
+  return call<ToolchainStatus>("toolchain_choose_flavor", { id, flavor });
+}
+
+/** Installs what is missing; resolves to the status afterwards. */
+export function toolchainSetup(
+  id: number,
+  onEvent: (event: SetupEvent) => void,
+): Promise<ToolchainStatus> {
+  return call<ToolchainStatus>("toolchain_setup", {
+    id,
+    onEvent: new Channel<SetupEvent>(onEvent),
+  });
+}
+
+export function toolchainCancel(): Promise<void> {
+  return call<undefined>("toolchain_cancel", {});
 }

@@ -1,13 +1,15 @@
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted } from "vue";
+import { onBeforeUnmount, onMounted, watch } from "vue";
 import { storeToRefs } from "pinia";
 import { useI18n } from "vue-i18n";
 import EditorArea from "../features/editor/EditorArea.vue";
 import ExplorerTree from "../features/explorer/ExplorerTree.vue";
+import SetupWizard from "../features/toolchain/SetupWizard.vue";
 import TrustDialog from "../features/trust/TrustDialog.vue";
 import WelcomeView from "../features/welcome/WelcomeView.vue";
 import { useEditorStore } from "../stores/editor";
 import { useProjectStore } from "../stores/project";
+import { useToolchainStore } from "../stores/toolchain";
 import StatusBar from "./StatusBar.vue";
 
 const { t } = useI18n();
@@ -15,6 +17,17 @@ const project = useProjectStore();
 const editor = useEditorStore();
 const { info, tree, trustPending, error: projectError } = storeToRefs(project);
 const { state: editorState } = storeToRefs(editor);
+const toolchain = useToolchainStore();
+const { wizardOpen } = storeToRefs(toolchain);
+
+// Load the toolchain status whenever another project becomes active.
+watch(
+  () => info.value?.id,
+  (id) => {
+    toolchain.reset();
+    if (id !== undefined) void toolchain.load(id);
+  },
+);
 
 async function closeProject(): Promise<void> {
   editor.closeAll();
@@ -76,6 +89,14 @@ onBeforeUnmount(() => {
         :root="info.root"
         @trust="project.setTrusted(true)"
         @restricted="project.dismissTrust()"
+      />
+      <SetupWizard
+        v-else-if="wizardOpen"
+        :project-id="info.id"
+        @close="
+          wizardOpen = false;
+          project.refreshTree();
+        "
       />
     </template>
     <p v-if="projectError" class="global-error" role="alert">

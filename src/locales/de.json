@@ -93,5 +93,58 @@
     "terraform": "Terraform",
     "ansible": "Ansible",
     "truncated": "Baum gekürzt (zu viele Einträge)"
+  },
+  "tool": {
+    "terraform": "Terraform",
+    "opentofu": "OpenTofu",
+    "terraformLs": "terraform-ls (Language Server)",
+    "uv": "uv (Python-Verwaltung)",
+    "node": "Node.js (für den Ansible-Language-Server)"
+  },
+  "pinSource": {
+    "projectToml": "gepinnt in project.toml",
+    "toolVersions": "aus .tool-versions",
+    "versionFile": "aus Versionsdatei",
+    "default": "App-Standard"
+  },
+  "toolchain": {
+    "title": "Werkzeuge einrichten",
+    "intro": "IaC Studio installiert die Werkzeuge, die dieses Projekt braucht, in ein eigenes Verzeichnis. Downloads kommen nur aus den offiziellen Quellen und werden vor der Nutzung geprüft.",
+    "flavorQuestion": "Welches Werkzeug soll dieses Projekt verwenden?",
+    "flavorOpentofu": "Open Source (MPL-2.0), gemeinschaftlich geführter Fork",
+    "flavorTerraform": "von HashiCorp (Business Source License)",
+    "flavorNote": "Die Wahl wird als Pin in .iac-studio/project.toml gespeichert, damit das ganze Team dasselbe Werkzeug in derselben Version nutzt.",
+    "flavorConfirm": "Auswahl speichern",
+    "required": "Benötigte Werkzeuge",
+    "installed": "installiert",
+    "missing": "nicht installiert",
+    "ansibleEnv": "Ansible-Umgebung",
+    "envVersions": "ansible-core {core}, ansible-lint {lint}, Python {python}",
+    "ready": "Alle Werkzeuge sind bereit.",
+    "installTool": "{tool} {version} installieren",
+    "createEnv": "Ansible-Umgebung anlegen (ansible-core {core}, ansible-lint {lint}, Python {python})",
+    "step": {
+      "pending": "wartet",
+      "running": "läuft",
+      "done": "fertig",
+      "failed": "fehlgeschlagen"
+    },
+    "phase": {
+      "verifying": "Signatur wird geprüft…",
+      "downloading": "Download",
+      "extracting": "Entpacken",
+      "done": "Fertig"
+    },
+    "log": "Ausgabe",
+    "done": "Einrichtung abgeschlossen.",
+    "cancelled": "Einrichtung abgebrochen.",
+    "failed": "Einrichtung fehlgeschlagen. Bereits installierte Werkzeuge bleiben erhalten.",
+    "cancel": "Abbrechen",
+    "close": "Schließen",
+    "start": "Einrichten",
+    "retry": "Erneut versuchen",
+    "statusReady": "Werkzeuge bereit",
+    "statusMissing": "Werkzeuge fehlen",
+    "open": "Werkzeuge einrichten"
   }
 }
