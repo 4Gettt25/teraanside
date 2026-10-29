@@ -25,6 +25,7 @@ src-tauri/target/debug/iac-studio <ORDNER> [DATEI]   # gebaute App direkt mit Pr
 RUST_LOG=info,iac_studio_lib=debug pnpm tauri dev   # mit Debug-Logs des Cores
 scripts/check.sh             # komplettes Qualitätsgate (lokal und in CI)
 scripts/check-crate-age.py origin/main   # Versionsregel für neue/geänderte Crates (braucht Netz; läuft in CI)
+cd src-tauri && cargo test real_ -- --ignored --nocapture   # Netztests: echte Tool-Downloads und komplette Einrichtung (~600 MB, nicht in CI)
 pnpm gen:types               # TS-Typen aus Rust neu erzeugen -> src/lib/generated/ (committen!)
 pnpm lint                    # ESLint (vue + typescript-eslint strictTypeChecked)
 pnpm format                  # Prettier schreiben; pnpm format:check prüft nur

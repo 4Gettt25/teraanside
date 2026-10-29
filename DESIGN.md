@@ -92,13 +92,34 @@ Die konkreten Versionen werden beim Scaffolding aus den aktuellen Releases besti
 - Downloads: Checksum- und, wo verfügbar, Signaturprüfung (HashiCorp/OpenTofu SHA256SUMS). Kein Ausführen ungeprüfter Binaries.
 - Pins stehen in `project.toml` und optional in `.tool-versions`/`.terraform-version`, falls vorhanden (lesen, nicht überschreiben).
 - Offline-Verhalten: Vorhandene Versionen nutzen, klarer Fehler bei fehlendem Download.
-- Der Node-Bedarf von `ansible-language-server` ist eine offene Frage (Abschnitt 14).
+- Der Node-Bedarf von `ansible-language-server` ist entschieden (14.1): Node-LTS wird wie die anderen Tools verwaltet.
+
+**Umgesetzt (M1b)**
+
+| Tool | Quelle (Allowlist) | Prüfung | Archiv → Datei |
+|---|---|---|---|
+| Terraform, terraform-ls | `https://releases.hashicorp.com/{terraform,terraform-ls}/…` | `…_SHA256SUMS` + `…_SHA256SUMS.72D7468F.sig` (HashiCorp-Schlüssel, signiert mit Unterschlüssel) | zip → `terraform` / `terraform-ls` |
+| OpenTofu | `https://github.com/opentofu/opentofu/releases/download/…` (→ `release-assets.githubusercontent.com`) | `tofu_<v>_SHA256SUMS` + `.gpgsig` (OpenTofu-Schlüssel) | tar.gz → `tofu` |
+| Node.js (für ALS) | `https://nodejs.org/dist/…` | `SHASUMS256.txt` + `.sig` (8 aktive Release-Schlüssel) | tar.gz → `node-v<v>-linux-x64/bin/node` |
+| uv | `https://github.com/astral-sh/uv/releases/download/…` (→ GitHub-Release-Assets) | **SHA256 pro Version fest in der App** (keine OpenPGP-Signatur vorhanden) | tar.gz → `uv` |
+
+- Schlüssel, Fingerprints, offizielle Quellen und das Verfahren für Schlüsselwechsel: `src-tauri/keys/README.md`. Ein Test schlägt 90 Tage vor dem Ablauf eines Schlüssels fehl.
+- Ablauf: Signatur der Prüfsummendatei prüfen (bzw. gepinnten Hash nehmen) → Download in ein Staging-Verzeichnis mit laufendem SHA256 → Vergleich → **genau eine** reguläre Datei extrahieren (Symlinks, Traversal-Einträge und alles andere werden nie geschrieben) → ausführbar machen → Marker → atomares `rename` nach `bin/<tool>/<version>/`. HTTPS only, Weiterleitungen nur zu Origins der Allowlist, Größenlimits, Abbruch möglich.
+- Signaturregeln über die reine Kryptoprüfung (`pgp`) hinaus: gültige Bindungssignaturen, Signier-Flag des (Unter-)Schlüssels, kein Widerruf, Schlüssel zum Signaturzeitpunkt nicht abgelaufen, kein MD5/SHA1/RIPEMD160, keine Signaturen aus der Zukunft.
+- Versionen sind strikt `MAJOR.MINOR.PATCH`; Pins aus Projektdateien sind nicht vertrauenswürdig und können so weder URLs noch Pfade noch Argumente manipulieren. tfenv-Syntax wie `latest` oder `~> 1.5` wird als Fehler gemeldet, nicht interpretiert.
+- Pin-Reihenfolge: `project.toml` → `.tool-versions` (asdf/mise: `terraform`/`opentofu`) → `.terraform-version` / `.opentofu-version` → App-Standard. Terraform oder OpenTofu ergibt sich aus `project.toml` oder eindeutig aus den Versionsdateien, sonst fragt der Assistent und schreibt die Wahl formaterhaltend (`toml_edit`) als Pin in `project.toml`.
+- Standardversionen (je ≥ 14 Tage alt, `catalog.rs`): Terraform 1.16.6, OpenTofu 1.13.1, terraform-ls 0.39.0, uv 0.13.1, Node 24.22.0, Python 3.13.16, ansible-core 2.21.5, ansible-lint 26.10.1. Aktualisieren: Version anheben, bei uv den Hash aus zwei Quellen (Release-`.sha256` und GitHub-API-Digest) eintragen, den Netztest `real_downloads` laufen lassen.
+- Ansible-Umgebung: `venvs/<16 Hex von sha256(Projektpfad)>/` mit uv: `uv venv --no-config --no-project --managed-python --clear --python <py>`, dann `uv pip install --only-binary :all: --exclude-newer P14D ansible-core==… ansible-lint==…`. Python ist ein uv-verwalteter Build, den uv gegen die in uv einkompilierten SHA256 prüft; nur Wheels (keine Build-Skripte aus sdists); `--exclude-newer P14D` überträgt die 14-Tage-Regel auch auf transitive PyPI-Pakete. Cache unter `$XDG_CACHE_HOME/iac-studio/uv`, Python unter `$XDG_DATA_HOME/iac-studio/python`.
+- Die Einrichtung führt **keinen Projektcode** aus (nur offizielle Binaries, venv außerhalb des Projekts) und verlangt deshalb kein Vertrauen. Codeausführende Funktionen (LSP, ansible-lint, terraform) verlangen weiterhin `TrustedProject`.
+- Gemessen (Netztest, 2026-10-30): alle fünf Tools inkl. Prüfung 23 s (~420 MB entpackt), vollständige Einrichtung eines gemischten Projekts inkl. Python und venv 26 s.
 
 ### 4.3 `runner`
 - Generischer Process Runner: Start, Stream von stdout/stderr (zeilenweise bzw. NDJSON), Abbruch (SIGINT → SIGTERM → SIGKILL mit Timeouts), Exit-Status, Arbeitsverzeichnis, bereinigte Umgebung (Allowlist statt Durchreichen aller Variablen).
 - Jeder Lauf bekommt eine `run_id`; Events tragen die `run_id`. Mehrere Läufe können parallel existieren.
 - Läufe werden persistiert (`.iac-studio/runs/<run_id>/`: Metadaten, Events als NDJSON, Rohlog), damit Historie und Wiederansicht funktionieren. Secrets werden vor dem Persistieren redigiert (Abschnitt 10).
 - PTY-Variante (`portable-pty`) nur für den Rohlog-Tab und interaktive Fälle.
+
+**Umgesetzt (M1b, Grundversion):** Start mit absolutem Programmpfad und Argument-Array (keine Shell, stdin geschlossen); Umgebung per Allowlist der Plattform (`HOME`, `USER`, `LOGNAME`, `PATH`, `LANG`, `LANGUAGE`, `LC_*`, `TZ`, `TMPDIR`, `SSH_AUTH_SOCK`, Proxy-Variablen) plus explizite Ergänzungen; Zeilen-Events (verlustbehaftetes UTF-8, CRLF, max. 1 MiB pro Zeile); Abbruch SIGINT → SIGTERM → SIGKILL an die ganze Prozessgruppe (Standard: 10 s / 5 s); Nachfahren, die nach dem Ende des Hauptprozesses noch die Pipes halten, werden nach 2 s beendet. `run_id`, Persistenz, Parser und PTY folgen in M2.
 
 ### 4.4 `terraform`
 - Befehle: `init`, `validate`, `fmt`, `plan`, `apply`, `destroy`, `output`, `state list/show`, `graph`, `providers schema -json`.
@@ -364,6 +385,8 @@ Geplanter Windows-Ansatz (später zu validieren):
 | 14 | uv: Herkunftsnachweis über SHA256 hinaus (Folgeaufgabe) | M1 prüft uv gegen einen **pro gepinnter Version fest in der App hinterlegten SHA256**. Geprüft am 2026-10-28: Astral veröffentlicht für Release-Assets **GitHub-Attestations** (für `uv-x86_64-unknown-linux-gnu.tar.gz` 0.13.6: SLSA Provenance v1 aus `astral-sh/uv` `.github/workflows/release.yml` und eine in-toto-Release-Attestation, abrufbar über `GET /repos/astral-sh/uv/attestations/sha256:<digest>`). Folgeaufgabe nach M1: Sigstore-Bundle-Prüfung (Zertifikatsidentität = Release-Workflow von `astral-sh/uv`) im Toolchain-Manager ergänzen, Crate-Wahl dann bewerten. |
 | 15 | LGPL-2.1+ im Bundle: `jschardet` | Kommt über `@codingame/monaco-vscode-api` (Encoding-Erkennung) und landet als eigener Chunk im Frontend-Bundle. Wir lesen Dateien ausschließlich als UTF-8 im Core, die Encoding-Erkennung wird also nicht gebraucht. Vorschlag: per Vite-`resolve.alias` durch einen Stub ersetzen und das in `THIRD_PARTY_LICENSES.md` vermerken; alternativ LGPL-Pflichten erfüllen (Quelle/Ersetzbarkeit). Entscheidung vor dem ersten Release, spätestens M5. |
 | 16 | E2E-Tests der Desktop-App | `tauri-driver` fehlt, der vorhandene `WebKitWebDriver` gehört zu WebKitGTK 6.0, die App nutzt webkit2gtk-4.1. M1a wurde per Smoke-Test der gebauten App verifiziert (Start mit `iac-studio <repo> <datei>`, Fehlerbrücke Frontend → Core-Log). Playwright/WebDriver-E2E wie geplant später. |
+| 17 | PyPI-Pakete der Ansible-Umgebung ohne Hash-Lock | M1b pinnt ansible-core/ansible-lint exakt, installiert nur Wheels und wendet `--exclude-newer P14D` an; die Hashes transitiver Pakete prüft nur uv gegen die Index-Metadaten. Folgeaufgabe: gesperrte Abhängigkeitsliste mit Hashes je App-Version (`uv pip compile --generate-hashes` → `--require-hashes`). |
+| 18 | Sicherheitsmeldungen für Abhängigkeiten in CI | In M1b wurden zwei RustSec-Advisories (RUSTSEC-2026-0382/0383, `rustls-webpki`/`webpki-root-certs`) nur manuell gefunden. Vorschlag: `cargo audit` (bzw. `cargo deny check advisories`) und `pnpm audit` als CI-Schritt; Treffer begründen Ausnahmen von der 14-Tage-Regel. |
 
 ### 14.1 Spike #2: Node-Bedarf von `ansible-language-server` (M1)
 

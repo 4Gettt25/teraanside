@@ -4,7 +4,7 @@
 > `DESIGN.md` (Architektur, Entscheidungen, §14 offene Fragen) und `CLAUDE.md` (Regeln,
 > Befehle). Diese Datei beschreibt nur, **wo wir stehen und was als Nächstes kommt**.
 >
-> Stand: 2026-10-29 · Branch `main` @ `77c5589` (9 Commits vor `origin/main`, **nicht gepusht**)
+> Stand: 2026-10-30 · Branch `main` (16 Commits vor `origin/main`, **nicht gepusht**)
 
 ## Überblick
 
@@ -12,17 +12,19 @@
 |---|---|
 | M0 Skeleton | ✅ abgenommen, CI grün (GitHub Actions) |
 | M1 Spike (#2 Node für ALS, #4 LSP-Transport) | ✅ entschieden, in `DESIGN.md` §14.1/§14.2; Spike-Code auf Branch `spike/m1-lsp` (gepusht, nicht für `main`) |
-| M1a Projekt, Editor, Vertrauen | ✅ umgesetzt, **wartet auf Durchsicht durch den Nutzer** (Haltepunkt) |
-| M1b Runner-Grundversion, Toolchain, Assistent | ⏳ nächster Schritt nach Freigabe |
+| M1a Projekt, Editor, Vertrauen | ✅ umgesetzt (Nutzer hat mit „weiter mit M1b“ fortgesetzt) |
+| M1b Runner-Grundversion, Toolchain, Assistent | ✅ umgesetzt, **wartet auf Durchsicht durch den Nutzer** (Haltepunkt) |
 | M1c LSP (terraform-ls, ansible-language-server) | ⏳ darf nach M1b bis zur M1-Abnahme durchlaufen |
 | M2–M5 | nicht begonnen |
 
-## Offene Entscheidungen des Nutzers (vor M1b klären)
+## Offene Entscheidungen des Nutzers (vor M1c klären)
 
-1. **Push:** Darf `main` (9 Commits M1a) nach `origin` gepusht werden?
+1. **Push:** Darf `main` (M1a + M1b) nach `origin` gepusht werden? (seit M1a unbeantwortet)
 2. **`jschardet` (LGPL-2.1+)** im Monaco-Bundle (`DESIGN.md` §14 #15): Vorschlag ist, es per
    Vite-`resolve.alias` durch einen Stub zu ersetzen (wir lesen nur UTF-8 im Core). Antwort steht aus.
-3. Durchsicht M1a (UI ansehen mit `pnpm tauri dev`).
+3. Durchsicht M1b (Assistent ansehen: `pnpm tauri dev`, Terraform-/Ansible-Repo öffnen, vertrauen).
+4. Vorschläge aus `DESIGN.md` §14 #17 (PyPI-Hash-Lock) und #18 (`cargo audit`/`pnpm audit` in CI):
+   jetzt, oder als Folgeaufgaben nach M1?
 
 ## Getroffene Entscheidungen (Kurzfassung, Details in DESIGN.md)
 
@@ -41,6 +43,12 @@
   Frontend `MonacoLanguageClient` mit eigenem Reader/Writer. **terraform-ls beendet sich nach
   `exit` erst bei stdin-EOF** → Core schließt stdin, dann Timeout → SIGTERM → SIGKILL.
 - Produktionsentwurf `core/lsp` steht in `DESIGN.md` §4.6.
+- Toolchain (M1b, Details `DESIGN.md` §4.2): Terraform/terraform-ls/OpenTofu/Node über signierte
+  Prüfsummen mit gepinnten Schlüsseln (`src-tauri/keys/README.md`), uv über fest hinterlegten SHA256;
+  Allowlist + Redirect-Regeln; Ansible-venv mit uv (nur Wheels, `--exclude-newer P14D`).
+  Einrichtung führt keinen Projektcode aus → braucht kein Vertrauen.
+- Sicherheitsausnahmen von der 14-Tage-Regel: `rustls-webpki` 0.103.16 (RUSTSEC-2026-0382),
+  `webpki-root-certs` 1.0.10 (RUSTSEC-2026-0383), siehe `supply-chain/crate-age-exceptions.txt`.
 - Monaco: monaco-languageclient **11.0.2** + `@codingame/*` **37.6.0** (Spike nutzte 11.0.3/37.6.1,
   zu jung). Grammatiken aus `hashicorp/syntax` @ `183de4f` (MPL-2.0, unverändert).
 - CSP: `'wasm-unsafe-eval'` nötig (TextMate/Oniguruma, nachgewiesen), kein `'unsafe-eval'`.
@@ -51,7 +59,7 @@
   SHA256-Konflikterkennung.
 - `core/project/tree.rs` – Projekterkennung + semantischer Baum (Dateisystem-Konventionen;
   Variablen/Outputs/Hosts erst M4).
-- `core/project/config.rs` – `.iac-studio/project.toml` **nur lesen** (Schreiben kommt in M1b).
+- `core/project/config.rs` – `.iac-studio/project.toml` lesen (Schreiben der Pins: `toolchain/pins.rs`).
 - `core/project/trust.rs` – `TrustStore` + `TrustedProject` (nur über `check`, compile_fail-Doctest E0451).
 - `core/project/watch.rs` – notify-Watcher, 250 ms Debounce.
 - `core/workspace.rs` – App-Zustand, `with_trusted`, Schreibsperre für `.git/`, CLI-Open.
@@ -60,31 +68,20 @@
 - Frontend: `src/app/App.vue`, `src/features/{explorer,editor,trust,welcome}/`,
   `src/stores/{project,editor,editorReducer}.ts`, `src/features/editor/monaco/` (lazy).
 
-## Nächster Schritt: M1b (freigegebener Plan)
+## Was M1b enthält (Code-Landkarte)
 
-1. **`core/runner` Grundversion** – nur Start (Executable + Argument-Array), Env-Allowlist,
-   Zeilen-Streaming, Abbruch SIGINT → SIGTERM → SIGKILL über `platform`. **Keine** Persistenz,
-   **keine** Parser (M2). Tests mit Fake-Binaries.
-2. **`core/toolchain`** – Download-Manager: Host-Allowlist, Größenlimit, SHA256, GPG-Signatur
-   gegen hinterlegte Schlüssel; atomare Installation nach
-   `$XDG_DATA_HOME/iac-studio/bin/<tool>/<version>/`. Tools: Terraform, OpenTofu, terraform-ls,
-   uv, Node 24 LTS. uv-venv pro Projekt mit gepinntem `ansible-core` + `ansible-lint`.
-   Pins aus `project.toml`; `.terraform-version`/`.tool-versions` nur lesen. Offline: vorhandene
-   Versionen nutzen, sonst klarer Fehler. Tests gegen wiremock (Checksumme/Signatur falsch,
-   fremder Host, Redirect auf fremden Host, Abbruch).
-3. **Einrichtungsassistent** – fehlende Tools zeigen, Plan bestätigen, Fortschritt.
-
-Vorgaben des Nutzers für M1b:
-- Ohne Pin fragt der Assistent **Terraform oder OpenTofu** und schreibt die Wahl als Pin in
-  `project.toml` (formaterhaltend schreiben, z. B. `toml_edit`).
-- **uv: erwarteten SHA256 pro gepinnter uv-Version fest in der App** hinterlegen und dagegen prüfen.
-- **Signaturschlüssel:** Fingerprint + offizielle Quelle pro Schlüssel dokumentieren, Test für
-  bald ablaufende Schlüssel, dokumentierter Weg für Schlüsselwechsel.
-  Bekannt: HashiCorp signiert `SHA256SUMS` (`…_SHA256SUMS.72D7468F.sig`), OpenTofu liefert
-  `SHA256SUMS.gpgsig` (+ cosign), Node `SHASUMS256.txt.sig`. Kandidat: `pgp`-Crate (rein Rust).
-- Alle Versionen beim Pinnen gegen die Registries belegen (≥ 14 Tage).
-
-**Nach M1b anhalten** und auf Durchsicht warten.
+- `src-tauri/src/core/runner/` – Grundversion: Argument-Array, Env-Allowlist, Zeilen-Events,
+  Abbruch an die Prozessgruppe (Tests mit Fake-Binaries in `runner/tests.rs`).
+- `core/toolchain/catalog.rs` – Tools, URLs, Standardversionen, uv-Hash pro Version.
+- `core/toolchain/keys.rs` + `src-tauri/keys/` – gepinnte Schlüssel (HashiCorp, OpenTofu, 8× Node).
+- `core/toolchain/signature.rs` – Signaturprüfung inkl. Ablauf-/Widerrufs-/Hash-Regeln.
+- `core/toolchain/download.rs`, `install.rs` – Allowlist-Downloads, verifizierte atomare Installation
+  (Tests gegen wiremock mit Testschlüssel in `testdata/fake-release/`).
+- `core/toolchain/pins.rs` – Pin-Auflösung, formaterhaltendes Schreiben in `project.toml`.
+- `core/toolchain/ansible_env.rs` – venv pro Projekt mit uv.
+- `core/toolchain/service.rs` – Status, Plan, Einrichtung mit Events; `commands/toolchain.rs`.
+- Frontend: `src/features/toolchain/SetupWizard.vue`, `src/stores/{toolchain,setupReducer}.ts`.
+- Netztests (manuell): `cd src-tauri && cargo test real_ -- --ignored --nocapture`.
 
 ## Danach: M1c (darf bis zur Abnahme durchlaufen)
 
@@ -118,6 +115,9 @@ Jeweils: erst Plan zeigen, dann Ergebnisse, auf Freigabe warten.
   `XDG_CONFIG_HOME=<tmp> src-tauri/target/debug/iac-studio <repo> <datei>`; Frontend-Fehler
   landen über `frontend_log` im Core-Log. Unter Wayland keine Screenshots möglich.
 - Lokale Umgebung: Arch Linux, Rust 1.97.1 (Arch-Paket, kein rustup), Node 26, pnpm 12.
-  Nicht installiert: terraform, tofu, terraform-ls, uv, docker/podman (Spike-Downloads lagen
-  im temporären Scratchpad und sind nicht mehr verfügbar).
+  Systemweit nicht installiert: terraform, tofu, terraform-ls, uv, docker/podman – die App lädt
+  ihre Tools selbst (Netztests oben).
+- Erster Build nach `pgp`/`reqwest` dauert lange (Krypto-Crates); kein Hängen.
+- `cargo update -p <crate> --precise <v>` für zu junge transitive Crates; vorher RustSec prüfen
+  (`gh api repos/rustsec/advisory-db/contents/crates/<crate>`), ob die neue Version ein Fix ist.
 - `gh` ist authentifiziert; Pushen nur nach Rückfrage.
