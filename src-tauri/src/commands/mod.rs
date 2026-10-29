@@ -5,5 +5,6 @@ mod error;
 pub mod frontend_log;
 pub mod ping;
 pub mod project;
+pub mod toolchain;
 
 pub use error::CommandError;

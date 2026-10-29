@@ -1,3 +1,5 @@
+use std::sync::{PoisonError, RwLock};
+
 use camino::{Utf8Path, Utf8PathBuf};
 
 use super::ProjectError;
@@ -9,7 +11,7 @@ pub struct OpenProject {
     root: Utf8PathBuf,
     name: String,
     fs: ProjectFs,
-    config: ProjectConfig,
+    config: RwLock<ProjectConfig>,
 }
 
 impl OpenProject {
@@ -32,7 +34,7 @@ impl OpenProject {
             root: canonical,
             name,
             fs,
-            config,
+            config: RwLock::new(config),
         })
     }
 
@@ -48,7 +50,18 @@ impl OpenProject {
         &self.fs
     }
 
-    pub fn config(&self) -> &ProjectConfig {
-        &self.config
+    /// The configuration as last loaded.
+    pub fn config(&self) -> ProjectConfig {
+        self.config
+            .read()
+            .unwrap_or_else(PoisonError::into_inner)
+            .clone()
+    }
+
+    /// Re-reads `project.toml` (after the wizard wrote a pin or an external edit).
+    pub fn reload_config(&self) -> Result<ProjectConfig, ProjectError> {
+        let fresh = config::load(&self.fs)?;
+        *self.config.write().unwrap_or_else(PoisonError::into_inner) = fresh.clone();
+        Ok(fresh)
     }
 }

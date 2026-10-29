@@ -28,6 +28,7 @@ cap-std = "=4.0.3"
 cap-tempfile = "=4.0.3"
 sha2 = "=0.11.1"
 toml = "=1.1.8"
+toml_edit = "=0.25.17"
 tauri-plugin-dialog = "=2.8.3"
 notify = { version = "=8.2.0", default-features = false }
 pgp = { version = "=0.21.0", default-features = false }

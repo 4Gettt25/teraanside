@@ -57,6 +57,14 @@ impl ProjectFs {
         self.root.try_clone()
     }
 
+    /// Creates a directory (and parents) inside the project.
+    pub fn create_dir_all(&self, rel: &str) -> Result<(), ProjectError> {
+        let path = validate_relative(rel)?;
+        self.root
+            .create_dir_all(path.as_std_path())
+            .map_err(|e| ProjectError::from_io(rel, e))
+    }
+
     pub fn read(&self, rel: &str) -> Result<FileContent, ProjectError> {
         let path = validate_relative(rel)?;
         let mut file = self

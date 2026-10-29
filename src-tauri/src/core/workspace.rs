@@ -36,9 +36,15 @@ pub struct ProjectInfo {
     pub config: ProjectConfig,
 }
 
-struct Entry {
+pub struct Entry {
     project: OpenProject,
     watcher: Mutex<Option<ProjectWatcher>>,
+}
+
+impl Entry {
+    pub fn project(&self) -> &OpenProject {
+        &self.project
+    }
 }
 
 /// Project (and optional file) given on the command line: `iac-studio [DIR [FILE]]`.
@@ -142,7 +148,8 @@ impl Workspace {
         lock(&self.settings).recent_projects()
     }
 
-    fn entry(&self, id: ProjectId) -> Result<Arc<Entry>, CoreError> {
+    /// Shared handle to an open project (kept alive by long-running operations).
+    pub fn entry(&self, id: ProjectId) -> Result<Arc<Entry>, CoreError> {
         lock(&self.projects)
             .get(&id)
             .cloned()
@@ -152,12 +159,14 @@ impl Workspace {
     pub fn info(&self, id: ProjectId) -> Result<ProjectInfo, CoreError> {
         let entry = self.entry(id)?;
         let p = &entry.project;
+        // pick up external edits of project.toml
+        let config = p.reload_config()?;
         Ok(ProjectInfo {
             id,
             name: p.name().to_owned(),
             root: p.root().to_string(),
             trusted: lock(&self.trust).is_trusted(p.root()),
-            config: p.config().clone(),
+            config,
         })
     }
 

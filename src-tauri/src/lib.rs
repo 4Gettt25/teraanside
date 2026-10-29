@@ -19,12 +19,16 @@ pub fn run() {
     init_tracing();
     tracing::info!(version = env!("CARGO_PKG_VERSION"), "starting IaC Studio");
 
-    let workspace = match platform::current()
+    let state = platform::current()
         .app_dirs()
         .map_err(core::CoreError::from)
-        .and_then(|dirs| core::workspace::Workspace::init(&dirs))
-    {
-        Ok(ws) => std::sync::Arc::new(ws),
+        .and_then(|dirs| {
+            let ws = core::workspace::Workspace::init(&dirs)?;
+            let tc = core::toolchain::service::Toolchain::new(dirs)?;
+            Ok((std::sync::Arc::new(ws), std::sync::Arc::new(tc)))
+        });
+    let (workspace, toolchain) = match state {
+        Ok(s) => s,
         Err(err) => {
             tracing::error!(error = %err, "failed to initialise application state");
             std::process::exit(1);
@@ -44,6 +48,7 @@ pub fn run() {
         // Used from Rust only (folder picker); no dialog permission is granted to the webview.
         .plugin(tauri_plugin_dialog::init())
         .manage(workspace)
+        .manage(toolchain)
         .invoke_handler(tauri::generate_handler![
             commands::ping::ping,
             commands::counter::start_counter,
@@ -58,6 +63,10 @@ pub fn run() {
             commands::project::file_read,
             commands::project::file_write,
             commands::frontend_log::frontend_log,
+            commands::toolchain::toolchain_status,
+            commands::toolchain::toolchain_choose_flavor,
+            commands::toolchain::toolchain_setup,
+            commands::toolchain::toolchain_cancel,
         ])
         .run(tauri::generate_context!())
     {

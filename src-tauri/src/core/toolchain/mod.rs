@@ -2,11 +2,14 @@
 //! Downloads come only from allowlisted official sources and are verified
 //! (OpenPGP-signed checksum files, or a pinned SHA256 for uv) before use.
 
+pub mod ansible_env;
 pub mod catalog;
 pub mod checksums;
 pub mod download;
 pub mod install;
 pub mod keys;
+pub mod pins;
+pub mod service;
 pub mod signature;
 pub mod version;
 
