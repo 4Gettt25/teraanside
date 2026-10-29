@@ -4,7 +4,8 @@
 > `DESIGN.md` (Architektur, Entscheidungen, §14 offene Fragen) und `CLAUDE.md` (Regeln,
 > Befehle). Diese Datei beschreibt nur, **wo wir stehen und was als Nächstes kommt**.
 >
-> Stand: 2026-10-30 · Branch `main` (16 Commits vor `origin/main`, **nicht gepusht**)
+> Stand: 2026-10-30 · Branch `main` gepusht (`aa3bab6` + dieser Doku-Commit), CI grün
+> ([Run 40973247344](https://github.com/4Gettt25/teraanside/actions/runs/40973247344), 7 min 38 s inkl. Crate-Alters-Prüfung)
 
 ## Überblick
 
@@ -13,13 +14,13 @@
 | M0 Skeleton | ✅ abgenommen, CI grün (GitHub Actions) |
 | M1 Spike (#2 Node für ALS, #4 LSP-Transport) | ✅ entschieden, in `DESIGN.md` §14.1/§14.2; Spike-Code auf Branch `spike/m1-lsp` (gepusht, nicht für `main`) |
 | M1a Projekt, Editor, Vertrauen | ✅ umgesetzt (Nutzer hat mit „weiter mit M1b“ fortgesetzt) |
-| M1b Runner-Grundversion, Toolchain, Assistent | ✅ umgesetzt, **wartet auf Durchsicht durch den Nutzer** (Haltepunkt) |
+| M1b Runner-Grundversion, Toolchain, Assistent | ✅ umgesetzt und gepusht, **Durchsicht durch den Nutzer steht aus** (Haltepunkt) |
 | M1c LSP (terraform-ls, ansible-language-server) | ⏳ darf nach M1b bis zur M1-Abnahme durchlaufen |
 | M2–M5 | nicht begonnen |
 
 ## Offene Entscheidungen des Nutzers (vor M1c klären)
 
-1. **Push:** Darf `main` (M1a + M1b) nach `origin` gepusht werden? (seit M1a unbeantwortet)
+1. ~~Push~~ – erledigt 2026-10-30 (Nutzer hat freigegeben), CI grün.
 2. **`jschardet` (LGPL-2.1+)** im Monaco-Bundle (`DESIGN.md` §14 #15): Vorschlag ist, es per
    Vite-`resolve.alias` durch einen Stub zu ersetzen (wir lesen nur UTF-8 im Core). Antwort steht aus.
 3. Durchsicht M1b (Assistent ansehen: `pnpm tauri dev`, Terraform-/Ansible-Repo öffnen, vertrauen).
@@ -120,4 +121,5 @@ Jeweils: erst Plan zeigen, dann Ergebnisse, auf Freigabe warten.
 - Erster Build nach `pgp`/`reqwest` dauert lange (Krypto-Crates); kein Hängen.
 - `cargo update -p <crate> --precise <v>` für zu junge transitive Crates; vorher RustSec prüfen
   (`gh api repos/rustsec/advisory-db/contents/crates/<crate>`), ob die neue Version ein Fix ist.
-- `gh` ist authentifiziert; Pushen nur nach Rückfrage.
+- `gh` ist authentifiziert; Pushen nur nach Rückfrage (Freigaben gelten pro Anlass).
+- CI braucht mit den Krypto-Crates ca. 8 min (vorher ca. 3,5 min).
