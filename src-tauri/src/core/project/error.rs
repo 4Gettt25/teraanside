@@ -15,8 +15,10 @@ pub enum ProjectError {
     SymlinkWrite(String),
     #[error("'{path}' is larger than {limit} bytes")]
     TooLarge { path: String, limit: u64 },
-    #[error("'{0}' is not valid UTF-8 text")]
+    #[error("'{0}' is a binary file")]
     NotText(String),
+    #[error("'{0}' is not UTF-8 encoded and is opened read-only; it cannot be saved")]
+    NotUtf8ReadOnly(String),
     #[error("'{0}' was changed on disk since it was loaded")]
     Conflict(String),
     #[error("'{0}' is not a directory")]
@@ -45,6 +47,7 @@ impl ProjectError {
             Self::SymlinkWrite(_) => "symlink_write",
             Self::TooLarge { .. } => "too_large",
             Self::NotText(_) => "not_text",
+            Self::NotUtf8ReadOnly(_) => "not_utf8_read_only",
             Self::Conflict(_) => "conflict",
             Self::NotADirectory(_) => "not_a_directory",
             Self::InvalidConfig(_) => "invalid_config",
@@ -57,6 +60,9 @@ impl ProjectError {
     pub fn hint(&self) -> Option<&'static str> {
         match self {
             Self::Conflict(_) => Some("Reload the file or overwrite it explicitly."),
+            Self::NotUtf8ReadOnly(_) => {
+                Some("Convert the file to UTF-8 with another tool (e.g. iconv) to edit it here.")
+            }
             Self::NotTrusted => Some("Trust the project to enable features that execute code."),
             Self::OutsideProject(_) => {
                 Some("Symbolic links pointing outside the project are not followed.")

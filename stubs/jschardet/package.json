@@ -1,0 +1,15 @@
+{
+  "name": "jschardet",
+  "version": "0.0.0-iac-studio-stub",
+  "description": "IaC Studio stub replacing jschardet (LGPL-2.1+). Encoding guessing is not needed: the core reads files as UTF-8 only (DESIGN.md §14 #15).",
+  "license": "MIT",
+  "private": true,
+  "main": "index.js",
+  "module": "index.mjs",
+  "exports": {
+    ".": {
+      "import": "./index.mjs",
+      "require": "./index.js"
+    }
+  }
+}

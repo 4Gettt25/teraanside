@@ -27,6 +27,14 @@ its inlined dependencies, `--legal-comments=external` output shipped alongside).
 
 `pnpm licenses list --prod` (2026-10-28): 92× MIT, 2× ISC, 1× Apache-2.0 OR MIT,
 1× (MPL-2.0 OR Apache-2.0) `dompurify` (we choose Apache-2.0), 1× BSD-2-Clause,
-1× BSD-3-Clause, 1× BlueOak-1.0.0, and **1× LGPL-2.1+: `jschardet`** (encoding
-detection, pulled in by `@codingame/monaco-vscode-api`). Status: open question,
-see DESIGN.md §14 #15.
+1× BSD-3-Clause, 1× BlueOak-1.0.0.
+
+### jschardet (LGPL-2.1+) – not shipped
+
+`@codingame/monaco-vscode-api` depends on `jschardet` (LGPL-2.1+) to guess file
+encodings. It is **replaced** by our own stub `stubs/jschardet` (MIT, `detect()` returns
+`null`) through a pnpm override in `pnpm-workspace.yaml`; the real package is not
+installed and not bundled. `scripts/check-bundle.sh` (part of the quality gate) fails if
+code from the real jschardet appears in the bundle. The stub is behaviour-neutral:
+the core reads files as UTF-8 only (non-UTF-8 files are opened read-only, see
+DESIGN.md §4.1), so encoding guessing is never needed.

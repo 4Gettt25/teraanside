@@ -37,7 +37,7 @@ cd src-tauri && cargo test   # exportiert dabei auch die ts-rs-Bindings
 pnpm tauri build             # Paket (AppImage/.deb), erst in M5 relevant
 ```
 
-**Qualitätsgate (vor jedem Commit):** `scripts/check.sh` führt aus: `cargo fmt --check`, `cargo clippy --locked --all-targets -- -D warnings`, `cargo test --locked`, Drift-Prüfung der generierten Typen (`src/lib/generated/` muss zum Rust-Code passen), `pnpm lint`, `pnpm format:check`, `pnpm typecheck`, `pnpm test`. CI: GitHub Actions (`.github/workflows/ci.yml`) ruft dasselbe Skript auf.
+**Qualitätsgate (vor jedem Commit):** `scripts/check.sh` führt aus: `cargo fmt --check`, `cargo clippy --locked --all-targets -- -D warnings`, `cargo test --locked`, Drift-Prüfung der generierten Typen (`src/lib/generated/` muss zum Rust-Code passen), `pnpm lint`, `pnpm format:check`, `pnpm typecheck`, `pnpm test`, Bundle-Prüfung (`scripts/check-bundle.sh`: kein `jschardet`-Code im Bundle). CI: GitHub Actions (`.github/workflows/ci.yml`) ruft dasselbe Skript auf.
 
 **Typgenerierung:** Frontend-sichtbare Typen mit `#[derive(TS)] #[ts(export)]` (ts-rs) annotieren; Exportziel steht in `.cargo/config.toml`. Tauri-Aufrufe nur über `src/lib/client.ts`.
 

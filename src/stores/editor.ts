@@ -38,7 +38,7 @@ export const useEditorStore = defineStore("editor", () => {
     try {
       const content = await fileRead(id, path);
       setBuffer(path, content.text);
-      dispatch({ type: "opened", path, sha256: content.sha256 });
+      dispatch({ type: "opened", path, sha256: content.sha256, readOnly: content.notUtf8 });
     } catch (err: unknown) {
       error.value = toCommandError(err);
     }
@@ -54,7 +54,8 @@ export const useEditorStore = defineStore("editor", () => {
     const id = projectId();
     const tab = state.value.tabs.find((t) => t.path === path);
     const text = getBuffer(path);
-    if (id === null || !tab || text === undefined) return false;
+    // read-only (non-UTF-8) files are never written, not even forced
+    if (id === null || !tab || tab.readOnly || text === undefined) return false;
     error.value = null;
     try {
       const sha256 = await fileWrite(id, path, text, force ? null : tab.sha256);
@@ -72,7 +73,7 @@ export const useEditorStore = defineStore("editor", () => {
     try {
       const content = await fileRead(id, path);
       setBuffer(path, content.text);
-      dispatch({ type: "reloaded", path, sha256: content.sha256 });
+      dispatch({ type: "reloaded", path, sha256: content.sha256, readOnly: content.notUtf8 });
     } catch (err: unknown) {
       error.value = toCommandError(err);
     }

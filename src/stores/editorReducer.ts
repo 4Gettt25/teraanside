@@ -9,6 +9,8 @@ export interface EditorTab {
   external: ExternalState;
   /** Increments whenever the buffer was replaced from disk (editor must reload). */
   revision: number;
+  /** Not UTF-8 on disk: shown lossy, never saved (DESIGN.md §4.1). */
+  readOnly: boolean;
 }
 
 export interface EditorState {
@@ -19,12 +21,12 @@ export interface EditorState {
 export const initialEditorState: EditorState = { tabs: [], active: null };
 
 export type EditorAction =
-  | { type: "opened"; path: string; sha256: string }
+  | { type: "opened"; path: string; sha256: string; readOnly?: boolean }
   | { type: "activated"; path: string }
   | { type: "closed"; path: string }
   | { type: "edited"; path: string }
   | { type: "saved"; path: string; sha256: string }
-  | { type: "reloaded"; path: string; sha256: string }
+  | { type: "reloaded"; path: string; sha256: string; readOnly?: boolean }
   | { type: "externalChanged"; path: string; sha256: string | null };
 
 function update(state: EditorState, path: string, f: (t: EditorTab) => EditorTab): EditorState {
@@ -43,6 +45,7 @@ export function reduceEditor(state: EditorState, action: EditorAction): EditorSt
         dirty: false,
         external: "none",
         revision: 0,
+        readOnly: action.readOnly ?? false,
       };
       return { tabs: [...state.tabs, tab], active: action.path };
     }
@@ -59,7 +62,7 @@ export function reduceEditor(state: EditorState, action: EditorAction): EditorSt
       return { tabs, active };
     }
     case "edited":
-      return update(state, action.path, (t) => (t.dirty ? t : { ...t, dirty: true }));
+      return update(state, action.path, (t) => (t.dirty || t.readOnly ? t : { ...t, dirty: true }));
     case "saved":
       return update(state, action.path, (t) => ({
         ...t,
@@ -74,6 +77,7 @@ export function reduceEditor(state: EditorState, action: EditorAction): EditorSt
         dirty: false,
         external: "none",
         revision: t.revision + 1,
+        readOnly: action.readOnly ?? t.readOnly,
       }));
     case "externalChanged":
       return update(state, action.path, (t) => {

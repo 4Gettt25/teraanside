@@ -36,4 +36,7 @@ pnpm typecheck
 step "pnpm test"
 pnpm test
 
+step "bundle check"
+scripts/check-bundle.sh
+
 printf '\n\033[1;32mQuality gate passed.\033[0m\n'

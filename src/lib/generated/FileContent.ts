@@ -3,4 +3,17 @@
 /**
  * Text content of a project file plus the hash used for conflict detection.
  */
-export type FileContent = { path: string, text: string, sha256: string, };
+export type FileContent = { path: string, 
+/**
+ * For non-UTF-8 files: lossy decoding (U+FFFD for invalid bytes), display only.
+ */
+text: string, 
+/**
+ * SHA256 of the bytes on disk.
+ */
+sha256: string, 
+/**
+ * The file is not valid UTF-8; it must only be shown read-only and is never
+ * written (DESIGN.md §4.1).
+ */
+notUtf8: boolean, };

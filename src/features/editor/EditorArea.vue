@@ -58,10 +58,13 @@ function fileName(path: string): string {
       </div>
     </div>
 
+    <p v-if="activeTab?.readOnly" class="notice" role="status">
+      {{ t("editor.notUtf8") }}
+    </p>
     <div v-if="activeTab?.external === 'changed'" class="notice" role="alert">
       {{ t("editor.externalChanged") }}
       <button type="button" @click="editor.reload(activeTab.path)">{{ t("editor.reload") }}</button>
-      <button type="button" @click="editor.save(activeTab.path, true)">
+      <button v-if="!activeTab.readOnly" type="button" @click="editor.save(activeTab.path, true)">
         {{ t("editor.overwrite") }}
       </button>
     </div>
@@ -80,6 +83,7 @@ function fileName(path: string): string {
           :project-root="info.root"
           :path="activeTab.path"
           :tabs="tabRevisions"
+          :read-only="activeTab.readOnly"
           :label="t('editor.contentOf', { path: activeTab.path })"
           @change="editor.edited"
           @failed="onMonacoFailed"
@@ -89,6 +93,7 @@ function fileName(path: string): string {
           :key="activeTab.path"
           :path="activeTab.path"
           :revision="activeTab.revision"
+          :read-only="activeTab.readOnly"
           :label="t('editor.contentOf', { path: activeTab.path })"
           @change="editor.edited"
         />

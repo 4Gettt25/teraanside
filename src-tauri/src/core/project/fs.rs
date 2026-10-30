@@ -21,14 +21,22 @@ use crate::platform;
 /// Files larger than this are not opened in the editor.
 pub const MAX_FILE_SIZE: u64 = 10 * 1024 * 1024;
 
+/// Bytes inspected to tell binary files (NUL bytes) from text.
+const BINARY_SNIFF_BYTES: usize = 8 * 1024;
+
 /// Text content of a project file plus the hash used for conflict detection.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
 #[ts(export)]
 pub struct FileContent {
     pub path: String,
+    /// For non-UTF-8 files: lossy decoding (U+FFFD for invalid bytes), display only.
     pub text: String,
+    /// SHA256 of the bytes on disk.
     pub sha256: String,
+    /// The file is not valid UTF-8; it must only be shown read-only and is never
+    /// written (DESIGN.md §4.1).
+    pub not_utf8: bool,
 }
 
 pub struct ProjectFs {
@@ -92,12 +100,19 @@ impl ProjectFs {
                 limit: MAX_FILE_SIZE,
             });
         }
+        if bytes[..bytes.len().min(BINARY_SNIFF_BYTES)].contains(&0) {
+            return Err(ProjectError::NotText(rel.to_owned()));
+        }
         let sha256 = hex_sha256(&bytes);
-        let text = String::from_utf8(bytes).map_err(|_| ProjectError::NotText(rel.to_owned()))?;
+        let (text, not_utf8) = match String::from_utf8(bytes) {
+            Ok(text) => (text, false),
+            Err(e) => (String::from_utf8_lossy(e.as_bytes()).into_owned(), true),
+        };
         Ok(FileContent {
             path: path.into_string(),
             text,
             sha256,
+            not_utf8,
         })
     }
 
@@ -138,18 +153,25 @@ impl ProjectFs {
                 return Err(ProjectError::NotAFile(rel.to_owned()));
             }
         }
-        if let Some(expected) = expected_sha256 {
-            let current = match &existing {
-                Some(_) => Some(hex_sha256(
-                    &parent
-                        .read(name)
-                        .map_err(|e| ProjectError::from_io(rel, e))?,
-                )),
-                None => None,
-            };
-            if current.as_deref() != Some(expected) {
-                return Err(ProjectError::Conflict(rel.to_owned()));
-            }
+        let current = match &existing {
+            Some(_) => Some(
+                parent
+                    .read(name)
+                    .map_err(|e| ProjectError::from_io(rel, e))?,
+            ),
+            None => None,
+        };
+        // Never overwrite a non-UTF-8 file: the editor only has a lossy decoding of it.
+        if current
+            .as_deref()
+            .is_some_and(|bytes| std::str::from_utf8(bytes).is_err())
+        {
+            return Err(ProjectError::NotUtf8ReadOnly(rel.to_owned()));
+        }
+        if let Some(expected) = expected_sha256
+            && current.as_deref().map(hex_sha256).as_deref() != Some(expected)
+        {
+            return Err(ProjectError::Conflict(rel.to_owned()));
         }
 
         let permissions = match &existing {
@@ -404,7 +426,29 @@ mod tests {
     }
 
     #[test]
-    fn rejects_non_text_and_directories() {
+    fn latin1_file_is_shown_lossy_and_never_overwritten() {
+        let f = fixture();
+        // "Grüße" in ISO-8859-1
+        let latin1 = b"name = \"Gr\xfc\xdfe\"\n".to_vec();
+        std::fs::write(f.root.join("legacy.tf"), &latin1).unwrap();
+        let fs = ProjectFs::open(&f.root).unwrap();
+        let c = fs.read("legacy.tf").unwrap();
+        assert!(c.not_utf8);
+        assert_eq!(c.text, "name = \"Gr\u{fffd}\u{fffd}e\"\n");
+        assert_eq!(c.sha256, hex_sha256(&latin1));
+        // neither a normal save (with hash) nor a forced one may touch the bytes
+        for expected in [Some(c.sha256.as_str()), None] {
+            assert!(matches!(
+                fs.write("legacy.tf", &c.text, expected),
+                Err(ProjectError::NotUtf8ReadOnly(_))
+            ));
+        }
+        assert_eq!(std::fs::read(f.root.join("legacy.tf")).unwrap(), latin1);
+        assert!(!fs.read("main.tf").unwrap().not_utf8);
+    }
+
+    #[test]
+    fn rejects_binary_files_and_directories() {
         let f = fixture();
         std::fs::write(f.root.join("bin"), [0xff, 0xfe, 0x00]).unwrap();
         let fs = ProjectFs::open(&f.root).unwrap();

@@ -10,6 +10,8 @@ const props = defineProps<{
   path: string;
   /** All open tabs with their reload revision. */
   tabs: { path: string; revision: number }[];
+  /** The active file must not be edited (non-UTF-8). */
+  readOnly: boolean;
   label: string;
 }>();
 const emit = defineEmits<{ change: [path: string]; failed: [error: string] }>();
@@ -39,6 +41,7 @@ async function showPath(path: string): Promise<void> {
     setBufferSource(path, () => model.getValue());
   }
   ed.setModel(open.model);
+  ed.updateOptions({ readOnly: props.readOnly });
   const state = viewStates.get(path);
   if (state) ed.restoreViewState(state);
   ed.focus();
@@ -73,6 +76,10 @@ onMounted(async () => {
 watch(
   () => props.path,
   (path) => void showPath(path),
+);
+watch(
+  () => props.readOnly,
+  (readOnly) => editor.value?.updateOptions({ readOnly }),
 );
 const seenRevisions = new Map<string, number>();
 watch(

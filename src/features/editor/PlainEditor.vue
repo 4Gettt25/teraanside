@@ -3,7 +3,7 @@
 import { ref, watch } from "vue";
 import { getBuffer, setBuffer } from "./buffers";
 
-const props = defineProps<{ path: string; revision: number; label: string }>();
+const props = defineProps<{ path: string; revision: number; readOnly: boolean; label: string }>();
 const emit = defineEmits<{ change: [path: string] }>();
 const text = ref(getBuffer(props.path) ?? "");
 
@@ -27,6 +27,7 @@ function onInput(event: Event): void {
     class="plain-editor"
     :value="text"
     :aria-label="label"
+    :readonly="readOnly"
     spellcheck="false"
     @input="onInput"
   ></textarea>

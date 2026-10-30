@@ -73,7 +73,8 @@
     "overwrite": "Keep mine and overwrite",
     "contentOf": "Content of {path}",
     "empty": "Select a file in the explorer.",
-    "fallback": "The code editor could not be loaded; using a plain text editor without highlighting."
+    "fallback": "The code editor could not be loaded; using a plain text editor without highlighting.",
+    "notUtf8": "This file is not UTF-8 encoded. It is shown read-only (invalid bytes appear as �) and cannot be saved here, so it is never overwritten. Convert it to UTF-8 to edit it."
   },
   "trust": {
     "title": "Do you trust the project “{name}”?",

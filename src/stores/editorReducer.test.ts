@@ -72,4 +72,13 @@ describe("reduceEditor", () => {
     ]);
     expect(s.tabs[0]).toMatchObject({ dirty: false, external: "none", revision: 1, sha256: "2" });
   });
+
+  it("read-only tabs never become dirty", () => {
+    const s = run([
+      { type: "opened", path: "legacy.tf", sha256: "1", readOnly: true },
+      { type: "edited", path: "legacy.tf" },
+    ]);
+    expect(s.tabs[0]).toMatchObject({ readOnly: true, dirty: false });
+    expect(run([{ type: "opened", path: "a", sha256: "1" }]).tabs[0]?.readOnly).toBe(false);
+  });
 });

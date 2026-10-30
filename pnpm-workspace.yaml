@@ -1,3 +1,8 @@
+# jschardet (LGPL-2.1+, pulled in by @codingame/monaco-vscode-api for encoding guessing) is
+# replaced by a local stub: the core only reads UTF-8 (DESIGN.md §14 #15, THIRD_PARTY_LICENSES.md).
+overrides:
+  jschardet: "link:./stubs/jschardet"
+
 # Supply-chain policy (CLAUDE.md "Versionsregel"): only install versions published >= 14 days ago.
 # pnpm enforces this for all dependencies incl. transitive ones and re-verifies the lockfile.
 minimumReleaseAge: 20160
