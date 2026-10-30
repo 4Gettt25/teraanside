@@ -1,0 +1,6 @@
+---
+- name: Demo play against localhost
+  hosts: local
+  gather_facts: false
+  roles:
+    - hello

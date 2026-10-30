@@ -160,6 +160,16 @@ src/lib/lsp/    TauriMessageReader/-Writer, startClient(kind, uri) mit MonacoLan
 - **Logging:** Nachrichten nur auf `trace`-Level und nie mit Inhalt von Dokumenten oder Settings auf `info`; stderr der Server auf `debug`.
 - **Frontend:** Monaco und `monaco-languageclient` per dynamischem Import; eine globale `MonacoVscodeApiWrapper`-Initialisierung; ein `MonacoLanguageClient` je Session; CSP-Ergänzungen laut 14.2/3.
 
+**Umgesetzt (M1c, 2026-10-30)** – wie entworfen, mit diesen Präzisierungen:
+- Prozessstart über den neuen Stdio-Modus von `core/runner` (rohes stdin/stdout für JSON-RPC, stderr zeilenweise, gleiche Env-Allowlist und Prozessgruppe). `core/lsp` startet nichts selbst.
+- **Neustart nach Absturz geht vom Client aus** (ein Neustart braucht ein neues `initialize`); der Core erzwingt das Budget von 3 Starts pro 60 s je Projekt und Server (`lsp_restart_limit`), der Client nutzt dieselbe Regel.
+- **Der Core erzwingt ALS-Einstellungen:** Er merkt sich die Abschnitte jeder `workspace/configuration`-Anfrage des Servers und überschreibt in der Client-Antwort sowie in `workspace/didChangeConfiguration` immer `executionEnvironment.enabled = false` und die Pfade zu Python, ansible und ansible-lint aus der Projekt-venv. Eine manipulierte Webview kann den einzigen Shell-String-Pfad von ALS damit nicht einschalten.
+- ALS: gebündelt durch `scripts/bundle-als.sh` (esbuild, ALS 26.6.0) nach `src-tauri/resources/als/` (committet, App-Ressource, Reproduzierbarkeit im Gate geprüft, Paket- und Lizenzliste daneben), gestartet mit dem verwalteten Node und `<venv>/bin` vorn im `PATH`.
+- Sprache `ansible` (YAML-Grammatik) wird für Ansible-Dateien gesetzt (Playbooks, alles unter `roles/`, `group_vars/`, `host_vars/`, Inventories eines Ansible-Projekts; entschieden aus dem semantischen Baum), weil ALS nur diese Language-ID bedient.
+- Vertrauen: `LspManager::start` verlangt `TrustedProject`; ein Test belegt, dass für ein nicht vertrautes Projekt weder terraform-ls noch ALS (und damit ansible-lint, das nur ALS aufruft) als Prozess entstehen.
+- Bekanntes Verhalten: Die VS-Code-Dienste melden dem Server nur Dokumente, die gerade in einem Editor angezeigt werden. Ein Tab, der beim Serverstart im Hintergrund lag, bekommt seine Diagnostics, sobald er angezeigt wird (gemessen 251 ms). Projektweite Diagnostics (z. B. `terraform validate`) kommen mit dem Diagnostics-Panel.
+- **Abnahme M1 (gebaute App, `examples/demo-infra` mit eingebauten Fehlern, frische Datenverzeichnisse):** Einrichtung über den Assistenten-Weg 27,7 s; terraform-ls: Diagnostics 501 ms nach Öffnen, Completion 7 Einträge in 54 ms, Hover; ALS: ansible-lint-Diagnostics nach 2,0–3,0 s, Completion 3.882 Einträge in 608–622 ms, Hover. Direkt gegen den Core (Netztest `real_language_servers`): terraform-ls `initialize` 52 ms, ALS `initialize` 154 ms.
+
 ### 4.7 `schema`
 - Terraform: `terraform providers schema -json` → normalisiertes internes Schema (Ressourcen, Datenquellen, Attribute, Typen, required/optional/computed, Beschreibungen). Cache pro Provider-Version.
 - Ansible: `ansible-doc -j -t module <name>` bzw. Gesamtliste → internes Schema (Parameter, Typen, Defaults, Choices, Beispiele).

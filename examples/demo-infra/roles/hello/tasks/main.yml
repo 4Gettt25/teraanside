@@ -1,0 +1,10 @@
+---
+- name: Say hello
+  ansible.builtin.debug:
+    msg: "{{ greeting }}, {{ inventory_hostname }}"
+
+- name: Write a marker file into /tmp
+  ansible.builtin.copy:
+    content: "{{ greeting }}\n"
+    dest: /tmp/iac-studio-demo.txt
+    mode: "0644"

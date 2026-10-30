@@ -28,6 +28,7 @@ scripts/supply-chain.sh      # Ignore-Ablauf, cargo deny, pnpm audit, npm-Lizenz
 scripts/check-crate-age.py origin/main   # Versionsregel für neue/geänderte Crates (braucht Netz; läuft in CI)
 cd src-tauri && cargo test real_ -- --ignored --nocapture   # Netztests: echte Tool-Downloads und komplette Einrichtung (~600 MB, nicht in CI)
 pnpm gen:types               # TS-Typen aus Rust neu erzeugen -> src/lib/generated/ (committen!)
+scripts/bundle-als.sh        # ansible-language-server bündeln -> src-tauri/resources/als/ (committen!; Gate prüft --check)
 pnpm lint                    # ESLint (vue + typescript-eslint strictTypeChecked)
 pnpm format                  # Prettier schreiben; pnpm format:check prüft nur
 pnpm typecheck               # vue-tsc (App + Tooling-Configs)
@@ -58,6 +59,7 @@ src/                 Vue-Frontend (siehe DESIGN.md Abschnitt 5)
   lib/generated/     ts-rs-Ausgabe, nie von Hand editieren
 fixtures/
   terraform/*.ndjson ansible/*.ndjson   echte aufgezeichnete Läufe
+examples/demo-infra/  Beispielrepo (null-Provider, Ansible localhost) für Abnahme und Ausprobieren
 scripts/
 DESIGN.md  CLAUDE.md
 ```
