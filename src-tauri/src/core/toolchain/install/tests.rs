@@ -355,3 +355,349 @@ async fn real_downloads_of_all_default_tools() {
         assert!(first.contains(version), "{tool:?}: {first}");
     }
 }
+
+// ---- Archive and download hardening (zip-slip, links, ordering, limits) ----
+
+mod hardening {
+    use std::io::Write;
+
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+
+    use super::*;
+
+    const MEMBER: &str = "faketool-1.0.0/bin/faketool";
+    const SCRIPT: &[u8] = b"#!/bin/sh\necho ok\n";
+
+    enum Entry<'a> {
+        File(&'a str, &'a [u8]),
+        /// Raw name written byte by byte (bypasses the tar crate's path checks).
+        RawName(&'a str, &'a [u8]),
+        Symlink(&'a str, &'a str),
+        Hardlink(&'a str, &'a str),
+    }
+
+    fn tar_gz(entries: &[Entry]) -> Vec<u8> {
+        let gz = flate2::write::GzEncoder::new(Vec::new(), flate2::Compression::fast());
+        let mut b = tar::Builder::new(gz);
+        for e in entries {
+            let mut h = tar::Header::new_gnu();
+            h.set_mode(0o755);
+            h.set_mtime(0);
+            match e {
+                Entry::File(name, data) => {
+                    h.set_size(data.len() as u64);
+                    h.set_path_absolute(name).unwrap();
+                    h.set_cksum();
+                    b.append(&h, *data).unwrap();
+                }
+                Entry::RawName(name, data) => {
+                    h.set_size(data.len() as u64);
+                    let raw = &mut h.as_old_mut().name;
+                    raw[..name.len()].copy_from_slice(name.as_bytes());
+                    h.set_cksum();
+                    b.append(&h, *data).unwrap();
+                }
+                Entry::Symlink(name, target) | Entry::Hardlink(name, target) => {
+                    h.set_size(0);
+                    h.set_entry_type(if matches!(e, Entry::Symlink(..)) {
+                        tar::EntryType::Symlink
+                    } else {
+                        tar::EntryType::Link
+                    });
+                    h.set_path(name).unwrap();
+                    h.set_link_name(target).unwrap();
+                    h.set_cksum();
+                    b.append(&h, std::io::empty()).unwrap();
+                }
+            }
+        }
+        b.into_inner().unwrap().finish().unwrap()
+    }
+
+    fn zip(entries: &[Entry]) -> Vec<u8> {
+        let mut w = zip::ZipWriter::new(std::io::Cursor::new(Vec::new()));
+        let opts = zip::write::SimpleFileOptions::default().unix_permissions(0o755);
+        for e in entries {
+            match e {
+                Entry::File(name, data) | Entry::RawName(name, data) => {
+                    w.start_file(*name, opts).unwrap();
+                    w.write_all(data).unwrap();
+                }
+                Entry::Symlink(name, target) | Entry::Hardlink(name, target) => {
+                    w.add_symlink(*name, *target, opts).unwrap();
+                }
+            }
+        }
+        w.finish().unwrap().into_inner()
+    }
+
+    fn leak_sha(bytes: &[u8]) -> &'static str {
+        Box::leak(crate::core::project::fs::hex_sha256(bytes).into_boxed_str())
+    }
+
+    fn artifact(base: &str, kind: ArchiveKind, member: &str, sha: &'static str) -> Artifact {
+        Artifact {
+            tool: Tool::Uv,
+            version: Version::parse("1.0.0").unwrap(),
+            url: format!("{base}/rel/archive"),
+            file_name: "archive".into(),
+            verification: Verification::PinnedSha256(sha),
+            archive: kind,
+            member: member.into(),
+            max_size: 1024 * 1024,
+        }
+    }
+
+    /// Every file below `root` (to prove nothing was written outside `bin/uv/1.0.0`).
+    fn all_files(root: &std::path::Path) -> Vec<String> {
+        let mut out = Vec::new();
+        let mut stack = vec![root.to_path_buf()];
+        while let Some(dir) = stack.pop() {
+            for e in std::fs::read_dir(&dir).into_iter().flatten().flatten() {
+                let p = e.path();
+                if e.file_type().unwrap().is_dir() {
+                    stack.push(p);
+                } else {
+                    out.push(p.strip_prefix(root).unwrap().to_string_lossy().into_owned());
+                }
+            }
+        }
+        out.sort();
+        out
+    }
+
+    async fn install_archive(
+        bytes: Vec<u8>,
+        kind: ArchiveKind,
+        member: &str,
+        sha: &'static str,
+    ) -> (Result<Utf8PathBuf, ToolchainError>, Vec<String>) {
+        let server = MockServer::start().await;
+        serve(&server, "/rel/archive", bytes).await;
+        let tmp = tempfile::tempdir().unwrap();
+        let bin = Utf8PathBuf::from_path_buf(tmp.path().join("data/bin")).unwrap();
+        let (r, _) = install(
+            &downloader(&server),
+            &bin,
+            &artifact(&server.uri(), kind, member, sha),
+        )
+        .await;
+        (r, all_files(tmp.path()))
+    }
+
+    #[tokio::test]
+    async fn traversal_and_absolute_entries_are_never_written() {
+        for kind in [ArchiveKind::TarGz, ArchiveKind::Zip] {
+            let entries = [
+                Entry::RawName("../../../escape-rel", b"pwned"),
+                Entry::File("/tmp/iac-studio-escape-abs", b"pwned"),
+                Entry::RawName("faketool-1.0.0/../../escape-mid", b"pwned"),
+                Entry::File(MEMBER, SCRIPT),
+            ];
+            let bytes = match kind {
+                ArchiveKind::TarGz => tar_gz(&entries),
+                ArchiveKind::Zip => zip(&entries),
+            };
+            let sha = leak_sha(&bytes);
+            let (r, files) = install_archive(bytes, kind, MEMBER, sha).await;
+            r.unwrap();
+            assert_eq!(
+                files,
+                [
+                    "data/bin/uv/1.0.0/.iac-studio-verified",
+                    "data/bin/uv/1.0.0/uv"
+                ],
+                "{kind:?}"
+            );
+            assert!(!std::path::Path::new("/tmp/iac-studio-escape-abs").exists());
+        }
+    }
+
+    #[tokio::test]
+    async fn member_that_is_a_link_is_rejected() {
+        let cases: Vec<(ArchiveKind, Vec<u8>)> = vec![
+            (
+                ArchiveKind::TarGz,
+                tar_gz(&[Entry::Symlink(MEMBER, "/etc/passwd")]),
+            ),
+            (
+                ArchiveKind::TarGz,
+                tar_gz(&[Entry::Symlink(MEMBER, "../../../../outside")]),
+            ),
+            (
+                ArchiveKind::TarGz,
+                tar_gz(&[Entry::Hardlink(MEMBER, "/etc/passwd")]),
+            ),
+            (
+                ArchiveKind::Zip,
+                zip(&[Entry::Symlink(MEMBER, "/etc/passwd")]),
+            ),
+        ];
+        for (kind, bytes) in cases {
+            let sha = leak_sha(&bytes);
+            let (r, files) = install_archive(bytes, kind, MEMBER, sha).await;
+            assert!(
+                matches!(r, Err(ToolchainError::Archive(_))),
+                "{kind:?}: {r:?}"
+            );
+            assert!(files.is_empty(), "{kind:?}: {files:?}");
+        }
+    }
+
+    #[tokio::test]
+    async fn entries_with_lookalike_names_do_not_match_the_member() {
+        // "./x", "x/", absolute and traversal spellings of the member name are not it
+        let bytes = tar_gz(&[
+            Entry::File(&format!("/{MEMBER}"), b"abs"),
+            Entry::RawName("faketool-1.0.0/bin/../bin/faketool", b"dotdot"),
+        ]);
+        let sha = leak_sha(&bytes);
+        let (r, files) = install_archive(bytes, ArchiveKind::TarGz, MEMBER, sha).await;
+        assert!(matches!(r, Err(ToolchainError::Archive(_))), "{r:?}");
+        assert!(files.is_empty(), "{files:?}");
+    }
+
+    #[tokio::test]
+    async fn checksum_is_verified_before_anything_is_extracted() {
+        let bytes = tar_gz(&[Entry::File(MEMBER, SCRIPT)]);
+        let wrong = "1111111111111111111111111111111111111111111111111111111111111111";
+        let (r, files) = install_archive(bytes, ArchiveKind::TarGz, MEMBER, wrong).await;
+        assert!(matches!(r, Err(ToolchainError::Checksum(_))), "{r:?}");
+        assert!(
+            files.is_empty(),
+            "nothing extracted or left behind: {files:?}"
+        );
+    }
+
+    #[tokio::test]
+    async fn signature_is_verified_before_the_archive_is_downloaded() {
+        let server = MockServer::start().await;
+        let mut sums = fixture("SHA256SUMS");
+        sums.extend_from_slice(b"\n");
+        serve(&server, "/rel/SHA256SUMS", sums).await;
+        serve(&server, "/rel/SHA256SUMS.sig", fixture("SHA256SUMS.sig")).await;
+        Mock::given(method("GET"))
+            .and(path("/rel/faketool_1.0.0_linux_amd64.zip"))
+            .respond_with(ResponseTemplate::new(200))
+            .expect(0) // verified when the server is dropped
+            .mount(&server)
+            .await;
+        let e = env();
+        let (r, _) = install(&downloader(&server), &e.bin, &signed_zip(&server.uri())).await;
+        assert!(matches!(r, Err(ToolchainError::Signature(_))), "{r:?}");
+    }
+
+    #[tokio::test]
+    async fn redirect_chains_are_checked_at_every_hop() {
+        let evil = MockServer::start().await;
+        serve(&evil, "/x", fixture("faketool-1.0.0.tar.gz")).await;
+        let mid = MockServer::start().await;
+        let front = MockServer::start().await;
+        let redirect =
+            |to: String| ResponseTemplate::new(302).insert_header("Location", to.as_str());
+        Mock::given(path("/rel/faketool-1.0.0.tar.gz"))
+            .respond_with(redirect(format!("{}/hop", mid.uri())))
+            .mount(&front)
+            .await;
+        Mock::given(path("/hop"))
+            .respond_with(redirect(format!("{}/x", evil.uri())))
+            .mount(&mid)
+            .await;
+        let mid_uri = mid.uri();
+        let d = Downloader::new(HostPolicy::local_test_server(
+            &front.uri(),
+            &[mid_uri.as_str()],
+        ))
+        .unwrap();
+        let e = env();
+        let a = pinned_tar(&front.uri(), "faketool-1.0.0.tar.gz", TAR_SHA);
+        let (r, _) = install(&d, &e.bin, &a).await;
+        assert!(
+            matches!(&r, Err(ToolchainError::Download(m)) if m.contains("redirect")),
+            "{r:?}"
+        );
+        assert_nothing_installed(&e.bin);
+    }
+
+    #[tokio::test]
+    async fn redirect_loops_are_cut_off() {
+        let server = MockServer::start().await;
+        let me = format!("{}/rel/faketool-1.0.0.tar.gz", server.uri());
+        Mock::given(path("/rel/faketool-1.0.0.tar.gz"))
+            .respond_with(ResponseTemplate::new(302).insert_header("Location", me.as_str()))
+            .mount(&server)
+            .await;
+        let e = env();
+        let (r, _) = install(
+            &downloader(&server),
+            &e.bin,
+            &pinned_tar(&server.uri(), "faketool-1.0.0.tar.gz", TAR_SHA),
+        )
+        .await;
+        assert!(
+            matches!(&r, Err(ToolchainError::Download(m)) if m.contains("redirect")),
+            "{r:?}"
+        );
+    }
+
+    /// A server that streams `total` bytes with chunked encoding (no Content-Length).
+    async fn chunked_server(total: usize) -> String {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        tokio::spawn(async move {
+            while let Ok((mut sock, _)) = listener.accept().await {
+                tokio::spawn(async move {
+                    let mut req = Vec::new();
+                    let mut buf = [0u8; 1024];
+                    while !req.windows(4).any(|w| w == b"\r\n\r\n") {
+                        let n = sock.read(&mut buf).await.unwrap_or(0);
+                        if n == 0 {
+                            return;
+                        }
+                        req.extend_from_slice(&buf[..n]);
+                    }
+                    let head = b"HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\nConnection: close\r\n\r\n";
+                    if sock.write_all(head).await.is_err() {
+                        return;
+                    }
+                    let chunk = vec![b'x'; 1024];
+                    for _ in 0..total / 1024 {
+                        let frame = [b"400\r\n".as_slice(), &chunk, b"\r\n"].concat();
+                        if sock.write_all(&frame).await.is_err() {
+                            return; // client gave up (expected once the limit is hit)
+                        }
+                    }
+                    let _ = sock.write_all(b"0\r\n\r\n").await;
+                });
+            }
+        });
+        format!("http://{addr}")
+    }
+
+    #[tokio::test]
+    async fn size_limit_applies_while_streaming_without_content_length() {
+        let base = chunked_server(10 * 1024 * 1024).await;
+        let d = Downloader::new(HostPolicy::local_test_server(&base, &[])).unwrap();
+        let e = env();
+        let mut a = artifact(&base, ArchiveKind::TarGz, MEMBER, TAR_SHA);
+        a.max_size = 64 * 1024;
+        let mut largest = 0u64;
+        let r = Installer {
+            downloader: &d,
+            bin_root: &e.bin,
+        }
+        .install(&a, &AtomicBool::new(false), |p| {
+            if let InstallProgress::Downloading { received, total } = p {
+                assert!(total.is_none(), "server must not announce a length");
+                largest = largest.max(received);
+            }
+        })
+        .await;
+        assert!(matches!(r, Err(ToolchainError::TooLarge { .. })), "{r:?}");
+        assert!(
+            largest <= 64 * 1024,
+            "never accepted more than the limit: {largest}"
+        );
+        assert_nothing_installed(&e.bin);
+    }
+}
