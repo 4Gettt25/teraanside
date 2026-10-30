@@ -44,11 +44,14 @@ pub fn run() {
         }
     }
 
-    if let Err(err) = tauri::Builder::default()
+    let lsp = std::sync::Arc::new(core::lsp::LspManager::default());
+
+    let app = tauri::Builder::default()
         // Used from Rust only (folder picker); no dialog permission is granted to the webview.
         .plugin(tauri_plugin_dialog::init())
         .manage(workspace)
         .manage(toolchain)
+        .manage(lsp)
         .invoke_handler(tauri::generate_handler![
             commands::ping::ping,
             commands::counter::start_counter,
@@ -67,10 +70,24 @@ pub fn run() {
             commands::toolchain::toolchain_choose_flavor,
             commands::toolchain::toolchain_setup,
             commands::toolchain::toolchain_cancel,
+            commands::lsp::lsp_start,
+            commands::lsp::lsp_send,
+            commands::lsp::lsp_stop,
         ])
-        .run(tauri::generate_context!())
-    {
-        tracing::error!(error = %err, "tauri application exited with an error");
-        std::process::exit(1);
-    }
+        .build(tauri::generate_context!());
+    let app = match app {
+        Ok(app) => app,
+        Err(err) => {
+            tracing::error!(error = %err, "failed to build tauri application");
+            std::process::exit(1);
+        }
+    };
+    app.run(|handle, event| {
+        if let tauri::RunEvent::ExitRequested { .. } = event {
+            use tauri::Manager;
+            // stop language servers cleanly (stdin EOF, grace, then signals)
+            let lsp = handle.state::<std::sync::Arc<core::lsp::LspManager>>();
+            tauri::async_runtime::block_on(lsp.stop_all());
+        }
+    });
 }

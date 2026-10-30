@@ -59,6 +59,15 @@ print_stdout = "deny"
 print_stderr = "deny"
 dbg_macro = "deny"
 
+# Dev/test builds: line tables only for our code, no debug info for dependencies.
+# Cuts memory use and link time considerably (the crypto/TLS stack is large);
+# backtraces still show file:line for our code.
+[profile.dev]
+debug = "line-tables-only"
+
+[profile.dev.package."*"]
+debug = false
+
 # See https://tauri.app/concept/size/#cargo-configuration
 [profile.release]
 codegen-units = 1

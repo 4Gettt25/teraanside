@@ -14,7 +14,7 @@ use camino::Utf8PathBuf;
 use serde::Serialize;
 use thiserror::Error;
 use tokio::io::AsyncRead;
-use tokio::process::{Child, Command};
+use tokio::process::{Child, ChildStdin, ChildStdout, Command};
 use tokio::sync::{mpsc, oneshot};
 use ts_rs::TS;
 
@@ -138,8 +138,7 @@ impl RunHandle {
     }
 }
 
-/// Starts `spec`; events (including the final `Exited`) are sent to `events`.
-pub fn spawn(spec: RunSpec, events: mpsc::Sender<RunEvent>) -> Result<RunHandle, RunnerError> {
+fn start(spec: &RunSpec, stdin_piped: bool) -> Result<Child, RunnerError> {
     if !spec.program.is_absolute() {
         return Err(RunnerError::RelativeProgram(spec.program.to_string()));
     }
@@ -149,19 +148,28 @@ pub fn spawn(spec: RunSpec, events: mpsc::Sender<RunEvent>) -> Result<RunHandle,
         .current_dir(spec.cwd.as_std_path())
         .env_clear()
         .envs(spec.env.vars())
-        .stdin(Stdio::null())
+        .stdin(if stdin_piped {
+            Stdio::piped()
+        } else {
+            Stdio::null()
+        })
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .kill_on_drop(true);
     platform::current().prepare_command(&mut command);
 
-    let mut child = command.spawn().map_err(|source| RunnerError::Spawn {
+    let child = command.spawn().map_err(|source| RunnerError::Spawn {
         program: spec.program.to_string(),
         source,
     })?;
-    let pid = child.id().unwrap_or(0);
-    tracing::debug!(pid, program = %spec.program, args = spec.args.len(), "process started");
+    tracing::debug!(pid = child.id(), program = %spec.program, args = spec.args.len(), "process started");
+    Ok(child)
+}
 
+/// Starts `spec`; events (including the final `Exited`) are sent to `events`.
+pub fn spawn(spec: RunSpec, events: mpsc::Sender<RunEvent>) -> Result<RunHandle, RunnerError> {
+    let mut child = start(&spec, false)?;
+    let pid = child.id().unwrap_or(0);
     let stdout = child.stdout.take();
     let stderr = child.stderr.take();
     let (cancel_tx, cancel_rx) = oneshot::channel();
@@ -172,6 +180,50 @@ pub fn spawn(spec: RunSpec, events: mpsc::Sender<RunEvent>) -> Result<RunHandle,
         pid,
         cancel: Some(cancel_tx),
         done,
+    })
+}
+
+/// A process whose stdin/stdout are used as a byte stream by the caller
+/// (language servers: JSON-RPC framing). stderr is still streamed as `Line`
+/// events, the exit as `Exited`.
+pub struct StdioProcess {
+    pub handle: RunHandle,
+    pub stdin: ChildStdin,
+    pub stdout: ChildStdout,
+}
+
+/// Like [`spawn`], but hands stdin and stdout to the caller.
+pub fn spawn_stdio(
+    spec: RunSpec,
+    events: mpsc::Sender<RunEvent>,
+) -> Result<StdioProcess, RunnerError> {
+    let mut child = start(&spec, true)?;
+    let pid = child.id().unwrap_or(0);
+    let missing = |what: &str| RunnerError::Spawn {
+        program: spec.program.to_string(),
+        source: std::io::Error::other(format!("{what} not captured")),
+    };
+    let stdin = child.stdin.take().ok_or_else(|| missing("stdin"))?;
+    let stdout = child.stdout.take().ok_or_else(|| missing("stdout"))?;
+    let stderr = child.stderr.take();
+    let (cancel_tx, cancel_rx) = oneshot::channel();
+    let done = tokio::spawn(supervise(
+        child,
+        pid,
+        None::<ChildStdout>,
+        stderr,
+        spec.stop,
+        cancel_rx,
+        events,
+    ));
+    Ok(StdioProcess {
+        handle: RunHandle {
+            pid,
+            cancel: Some(cancel_tx),
+            done,
+        },
+        stdin,
+        stdout,
     })
 }
 

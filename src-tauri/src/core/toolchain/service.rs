@@ -115,6 +115,14 @@ pub enum SetupEvent {
     },
 }
 
+/// Installed tools for the language servers (`None` = not set up).
+#[derive(Debug, Clone, Default)]
+pub struct LspPaths {
+    pub terraform_ls: Option<camino::Utf8PathBuf>,
+    pub node: Option<camino::Utf8PathBuf>,
+    pub venv: Option<camino::Utf8PathBuf>,
+}
+
 pub struct Toolchain {
     dirs: AppDirs,
     downloader: Downloader,
@@ -158,6 +166,29 @@ impl Toolchain {
             project,
             detected,
         )
+    }
+
+    /// Paths the language servers need for `project` (only what is installed).
+    pub fn lsp_paths(&self, project: &OpenProject) -> LspPaths {
+        let installed = |tool: Tool, raw: &str| {
+            Version::parse(raw)
+                .ok()
+                .and_then(|v| self.installed_tool(tool, &v))
+        };
+        let pins = pins::ansible_pins(&project.config());
+        let venv = match (pins.python, pins.core, pins.lint) {
+            (Ok(py), Ok(core), Ok(lint)) => {
+                let env_pins = EnvPins::new(&py, &core.version, &lint.version);
+                let dir = ansible_env::venv_dir(&self.dirs.data, project.root());
+                ansible_env::is_ready(&dir, &env_pins).then_some(dir)
+            }
+            _ => None,
+        };
+        LspPaths {
+            terraform_ls: installed(Tool::TerraformLs, defaults::TERRAFORM_LS),
+            node: installed(Tool::Node, defaults::NODE),
+            venv,
+        }
     }
 
     /// Writes the wizard's Terraform/OpenTofu choice as pin into `project.toml`.

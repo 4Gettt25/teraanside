@@ -1,5 +1,6 @@
 use thiserror::Error;
 
+use crate::core::lsp::LspError;
 use crate::core::project::ProjectError;
 use crate::core::toolchain::ToolchainError;
 use crate::platform::PlatformError;
@@ -17,6 +18,8 @@ pub enum CoreError {
     Project(#[from] ProjectError),
     #[error(transparent)]
     Toolchain(#[from] ToolchainError),
+    #[error(transparent)]
+    Lsp(#[from] LspError),
 }
 
 impl CoreError {
@@ -27,6 +30,7 @@ impl CoreError {
             Self::Platform(_) => "platform",
             Self::Project(e) => e.code(),
             Self::Toolchain(e) => e.code(),
+            Self::Lsp(e) => e.code(),
         }
     }
 
@@ -38,6 +42,7 @@ impl CoreError {
             }
             Self::Project(e) => e.hint(),
             Self::Toolchain(e) => e.hint(),
+            Self::Lsp(e) => e.hint(),
         }
     }
 }

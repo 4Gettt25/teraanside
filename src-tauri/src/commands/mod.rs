@@ -3,6 +3,7 @@
 pub mod counter;
 mod error;
 pub mod frontend_log;
+pub mod lsp;
 pub mod ping;
 pub mod project;
 pub mod toolchain;

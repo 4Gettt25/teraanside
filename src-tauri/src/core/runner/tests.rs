@@ -253,3 +253,42 @@ async fn assert_gone(pid: u32) {
         tokio::time::sleep(Duration::from_millis(50)).await;
     }
 }
+
+#[tokio::test]
+async fn stdio_mode_gives_raw_streams_and_still_reports_stderr_and_exit() {
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+    // echo stdin back, one note on stderr
+    let f = fake("echo note >&2; cat");
+    let (tx, mut rx) = mpsc::channel(64);
+    let mut p = spawn_stdio(spec(&f.path), tx).unwrap();
+    p.stdin
+        .write_all(b"Content-Length: 2\r\n\r\n{}")
+        .await
+        .unwrap();
+    drop(p.stdin); // EOF -> cat exits
+    let mut out = Vec::new();
+    p.stdout.read_to_end(&mut out).await.unwrap();
+    assert_eq!(out, b"Content-Length: 2\r\n\r\n{}");
+    let outcome = p.handle.wait().await.unwrap();
+    assert_eq!(outcome.code, Some(0));
+    let mut events = Vec::new();
+    while let Ok(e) = rx.try_recv() {
+        events.push(e);
+    }
+    assert_eq!(lines(&events, OutputStream::Stderr), ["note"]);
+    assert!(
+        lines(&events, OutputStream::Stdout).is_empty(),
+        "stdout is not consumed by the runner"
+    );
+    assert!(matches!(events.last(), Some(RunEvent::Exited(_))));
+}
+
+#[tokio::test]
+async fn stdio_mode_cancel_stops_the_process() {
+    let f = fake("trap '' INT; cat");
+    let (tx, _rx) = mpsc::channel(64);
+    let mut p = spawn_stdio(spec(&f.path), tx).unwrap();
+    p.handle.cancel();
+    let outcome = p.handle.wait().await.unwrap();
+    assert!(outcome.cancelled);
+}

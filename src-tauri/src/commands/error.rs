@@ -25,6 +25,12 @@ impl From<CoreError> for CommandError {
     }
 }
 
+impl From<crate::core::lsp::LspError> for CommandError {
+    fn from(err: crate::core::lsp::LspError) -> Self {
+        CoreError::from(err).into()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
