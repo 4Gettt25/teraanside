@@ -1,0 +1,54 @@
+# cargo-deny configuration (CI: supply-chain job, PRs + weekly). Docs:
+# https://embarkstudios.github.io/cargo-deny/
+# Every ignore/exception needs a reason with "expires: YYYY-MM-DD"
+# (checked by scripts/check-audit-ignores.py).
+
+[graph]
+targets = ["x86_64-unknown-linux-gnu"]
+all-features = false
+
+[advisories]
+# RustSec advisory DB; any vulnerability, unmaintained or unsound crate fails.
+unmaintained = "all"
+yanked = "deny"
+ignore = [
+  # rsa (via pgp): timing side channel in *private-key* operations. We only verify
+  # signatures with public keys over public data; no fixed rsa release exists.
+  { id = "RUSTSEC-2023-0071", reason = "only public-key signature verification (no secret key ops); no fix released. expires: 2027-04-30" },
+  # crypto-bigint 0.5 (via pgp/elliptic-curve): timing variability with *secret* integers;
+  # we only verify public signatures. Fix only in 0.7.6 (incompatible with 0.5 users).
+  { id = "RUSTSEC-2026-0387", reason = "only operates on public data (signature verification); fix only in incompatible 0.7.x. expires: 2027-04-30" },
+  # proc-macro-error (build-time proc macro of gtk-rs 0.18, pulled in by tauri on Linux).
+  { id = "RUSTSEC-2024-0370", reason = "unmaintained build-time proc macro of gtk-rs 0.18 via tauri; no runtime code, no alternative. expires: 2027-04-30" },
+]
+
+[licenses]
+# Permissive licenses compatible with distributing the app.
+allow = [
+  "MIT",
+  "Apache-2.0",
+  "Apache-2.0 WITH LLVM-exception",
+  "BSD-2-Clause",
+  "BSD-3-Clause",
+  "ISC",
+  "Zlib",
+  "Unicode-3.0",
+  "CC0-1.0",
+  "MPL-2.0",
+]
+confidence-threshold = 0.9
+exceptions = []
+
+[licenses.private]
+ignore = true
+
+[bans]
+multiple-versions = "allow"
+wildcards = "deny"
+allow-wildcard-paths = true
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]
+allow-git = []

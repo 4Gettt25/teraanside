@@ -23,7 +23,8 @@ pnpm install                 # Frontend-Abhängigkeiten (Lockfile: pnpm-lock.yam
 pnpm tauri dev               # App im Entwicklungsmodus (Vite auf :1420 + Rust-Core)
 src-tauri/target/debug/iac-studio <ORDNER> [DATEI]   # gebaute App direkt mit Projekt/Datei öffnen (nach `pnpm tauri build --debug --no-bundle`)
 RUST_LOG=info,iac_studio_lib=debug pnpm tauri dev   # mit Debug-Logs des Cores
-scripts/check.sh             # komplettes Qualitätsgate (lokal und in CI)
+scripts/check.sh             # komplettes Qualitätsgate (= check-rust.sh + check-frontend.sh; CI: parallele Jobs)
+scripts/supply-chain.sh      # Ignore-Ablauf, cargo deny, pnpm audit, npm-Lizenzen (braucht Netz + cargo-deny; CI: PR + wöchentlich)
 scripts/check-crate-age.py origin/main   # Versionsregel für neue/geänderte Crates (braucht Netz; läuft in CI)
 cd src-tauri && cargo test real_ -- --ignored --nocapture   # Netztests: echte Tool-Downloads und komplette Einrichtung (~600 MB, nicht in CI)
 pnpm gen:types               # TS-Typen aus Rust neu erzeugen -> src/lib/generated/ (committen!)
@@ -66,6 +67,7 @@ DESIGN.md  CLAUDE.md
 ### Abhängigkeiten
 - Versionsregel: Neue Abhängigkeiten und Updates nur auf Versionen, die seit mindestens 14 Tagen veröffentlicht sind. Ausnahme: Sicherheitsfix für eine nachweislich betroffene Version (Advisory/CVE im Commit verlinken). Lockfiles (Cargo.lock, pnpm-lock.yaml) werden committet, CI installiert mit --locked bzw. --frozen-lockfile.
 - Durchsetzung npm: `pnpm-workspace.yaml` setzt `minimumReleaseAge: 20160` (strikt, auch transitiv, Lockfile wird bei jedem Install geprüft). Sicherheitsausnahmen als exakte Version in `minimumReleaseAgeExclude` mit Link als Kommentar.
+- Sicherheitsmeldungen: `scripts/supply-chain.sh` (cargo-deny + pnpm audit) ist blockierend. Ignores nur mit Begründung und Ablaufdatum in `deny.toml` bzw. `supply-chain/pnpm-audit-ignores.toml`; ein Fix per Override/Update ist einem Ignore vorzuziehen. Lizenzen: Allowlists in `deny.toml` (Rust) und `supply-chain/npm-licenses.toml` (npm).
 - Durchsetzung Rust: Cargo hat keine entsprechende Einstellung; CI führt `scripts/check-crate-age.py <base>` aus (prüft neue/geänderte `Cargo.lock`-Einträge gegen crates.io). Ausnahmen in `supply-chain/crate-age-exceptions.txt` mit Link.
 
 ### Rust

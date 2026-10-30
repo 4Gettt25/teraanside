@@ -5,6 +5,8 @@ description = "Desktop studio for Terraform/OpenTofu and Ansible projects"
 authors = ["Felix Günther"]
 edition = "2024"
 rust-version = "1.97"
+# not published; license decision pending (DESIGN.md §14 #9)
+publish = false
 
 [lib]
 # The `_lib` suffix keeps the lib name distinct from the bin name

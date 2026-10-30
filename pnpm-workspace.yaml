@@ -2,6 +2,9 @@
 # replaced by a local stub: the core only reads UTF-8 (DESIGN.md §14 #15, THIRD_PARTY_LICENSES.md).
 overrides:
   jschardet: "link:./stubs/jschardet"
+  # Security fix: @codingame/* pin dompurify 3.4.15 (GHSA-cg2g-xh64-v4q7 critical,
+  # GHSA-mrv2-3pqr-j5jr high, 3 low); 3.4.17 is the patched patch release (>= 14 days old).
+  dompurify: "3.4.17"
 
 # Supply-chain policy (CLAUDE.md "Versionsregel"): only install versions published >= 14 days ago.
 # pnpm enforces this for all dependencies incl. transitive ones and re-verifies the lockfile.
@@ -92,3 +95,6 @@ minimumReleaseAgeExclude:
   - "vite@8.3.5"
   - "vitest@5.0.5"
   - "vue-i18n@11.4.16"
+auditConfig:
+  ignoreGhsas:
+    - GHSA-238p-pmpm-9mq7

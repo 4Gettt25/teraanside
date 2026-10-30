@@ -84,6 +84,12 @@
 - Frontend: `src/features/toolchain/SetupWizard.vue`, `src/stores/{toolchain,setupReducer}.ts`.
 - Netztests (manuell): `cd src-tauri && cargo test real_ -- --ignored --nocapture`.
 
+## Nach M1c, vor M2: PyPI-Hash-Lock (eigener Schritt)
+
+Vom Nutzer so festgelegt (2026-10-30), Details `DESIGN.md` §14 #17: erste Einrichtung löst auf
+und schreibt eine Lockdatei mit Hashes nach `.iac-studio/`, danach `uv pip install --require-hashes`.
+`--exclude-newer P14D` existiert in uv 0.13.1 (geprüft) und gilt auch beim Erzeugen der Lockdatei.
+
 ## Danach: M1c (darf bis zur Abnahme durchlaufen)
 
 - `core/lsp` nach `DESIGN.md` §4.6; zuerst terraform-ls, dann ansible-language-server.

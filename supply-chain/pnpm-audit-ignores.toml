@@ -1,0 +1,11 @@
+# Advisories `pnpm audit` may ignore. Every entry needs a reason and an expiry date
+# (scripts/check-audit-ignores.py fails after it). Prefer overrides to ignores.
+
+[[ignore]]
+id = "GHSA-238p-pmpm-9mq7"
+package = "katex"
+reason = """Low severity; only exploitable with already existing prototype pollution. katex
+(0.16.45, pinned exactly by @codingame/monaco-vscode-katex-common) renders math in VS Code
+markdown, a feature IaC Studio does not use. Fix is in 0.18.2 (minor 0.x bump, possibly
+incompatible). Revisit with the next @codingame/monaco-vscode-* update."""
+expires = 2027-01-31
