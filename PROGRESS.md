@@ -4,7 +4,9 @@
 > `DESIGN.md` (Architektur, Entscheidungen, §14 offene Fragen) und `CLAUDE.md` (Regeln,
 > Befehle). Diese Datei beschreibt nur, **wo wir stehen und was als Nächstes kommt**.
 >
-> Stand: 2026-10-30 · Branch `main` gepusht, CI siehe unten. **M1 ist umgesetzt und wartet auf die Abnahme durch den Nutzer.**
+> Stand: 2026-10-30 · Branch `main` gepusht (`ce5e3ac` + dieser Doku-Commit), CI grün
+> ([Run 41130201629](https://github.com/4Gettt25/teraanside/actions/runs/41130201629): rust 1:38, frontend 0:47,
+> supply chain 0:48 – parallel, mit Cache). **M1 ist umgesetzt und wartet auf die Abnahme durch den Nutzer.**
 
 ## Überblick
 
