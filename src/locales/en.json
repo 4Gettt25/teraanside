@@ -147,5 +147,19 @@
     "statusReady": "Tools ready",
     "statusMissing": "Tools missing",
     "open": "Set up tools"
+  },
+  "lsp": {
+    "name": {
+      "terraform": "Terraform LS",
+      "ansible": "Ansible LS"
+    },
+    "state": {
+      "off": "off",
+      "starting": "starting",
+      "running": "running",
+      "restricted": "restricted mode",
+      "unavailable": "tools missing",
+      "failed": "failed"
+    }
   }
 }

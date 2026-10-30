@@ -12,9 +12,16 @@ const props = defineProps<{
   tabs: { path: string; revision: number }[];
   /** The active file must not be edited (non-UTF-8). */
   readOnly: boolean;
+  /** Language override for a path (Ansible YAML -> "ansible"), `null` = by extension. */
+  languageFor: (path: string) => string | null;
   label: string;
 }>();
-const emit = defineEmits<{ change: [path: string]; failed: [error: string] }>();
+const emit = defineEmits<{
+  change: [path: string];
+  failed: [error: string];
+  /** The language of a newly shown model (to start its language server). */
+  language: [languageId: string];
+}>();
 
 const container = ref<HTMLElement | null>(null);
 const editor = shallowRef<monacoApi.editor.IStandaloneCodeEditor | null>(null);
@@ -35,6 +42,8 @@ async function showPath(path: string): Promise<void> {
     open = await setup.openModel(`${props.projectRoot}/${path}`, getBuffer(path) ?? "");
     models.set(path, open);
     const model = open.model;
+    const override = props.languageFor(path);
+    if (override) setup.setLanguage(model, override);
     model.onDidChangeContent(() => {
       if (!applyingFromDisk) emit("change", path);
     });
@@ -42,6 +51,7 @@ async function showPath(path: string): Promise<void> {
   }
   ed.setModel(open.model);
   ed.updateOptions({ readOnly: props.readOnly });
+  emit("language", open.model.getLanguageId());
   const state = viewStates.get(path);
   if (state) ed.restoreViewState(state);
   ed.focus();

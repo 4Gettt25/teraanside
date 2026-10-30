@@ -2,6 +2,7 @@
 import { storeToRefs } from "pinia";
 import { useI18n } from "vue-i18n";
 import { useEditorStore } from "../stores/editor";
+import { useLspStore } from "../stores/lsp";
 import { useProjectStore } from "../stores/project";
 import { useToolchainStore } from "../stores/toolchain";
 
@@ -12,6 +13,9 @@ const { info, tree } = storeToRefs(project);
 const { activeTab } = storeToRefs(editor);
 const toolchain = useToolchainStore();
 const { status: tools } = storeToRefs(toolchain);
+const lsp = useLspStore();
+const { servers } = storeToRefs(lsp);
+const KINDS = ["terraform", "ansible"] as const;
 </script>
 
 <template>
@@ -34,6 +38,16 @@ const { status: tools } = storeToRefs(toolchain);
           </button>
         </span>
       </template>
+    </template>
+    <template v-for="kind in KINDS" :key="kind">
+      <span
+        v-if="servers[kind].state !== 'off'"
+        class="lsp"
+        :class="servers[kind].state"
+        :title="'message' in servers[kind] ? servers[kind].message : undefined"
+      >
+        {{ t(`lsp.name.${kind}`) }}: {{ t(`lsp.state.${servers[kind].state}`) }}
+      </span>
     </template>
     <span class="spacer"></span>
     <span v-if="activeTab">{{ activeTab.path }}</span>
@@ -63,6 +77,19 @@ const { status: tools } = storeToRefs(toolchain);
 .restricted button {
   font-size: 0.75rem;
   margin-left: 0.4rem;
+}
+.lsp.running::before {
+  content: "✓ ";
+}
+.lsp.starting::before {
+  content: "⟳ ";
+}
+.lsp.restricted::before {
+  content: "🔒 ";
+}
+.lsp.unavailable::before,
+.lsp.failed::before {
+  content: "⚠ ";
 }
 .warn button {
   font-size: 0.75rem;

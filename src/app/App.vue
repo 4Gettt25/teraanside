@@ -9,6 +9,7 @@ import TrustDialog from "../features/trust/TrustDialog.vue";
 import WelcomeView from "../features/welcome/WelcomeView.vue";
 import { useEditorStore } from "../stores/editor";
 import { useProjectStore } from "../stores/project";
+import { useLspStore } from "../stores/lsp";
 import { useToolchainStore } from "../stores/toolchain";
 import StatusBar from "./StatusBar.vue";
 
@@ -18,18 +19,29 @@ const editor = useEditorStore();
 const { info, tree, trustPending, error: projectError } = storeToRefs(project);
 const { state: editorState } = storeToRefs(editor);
 const toolchain = useToolchainStore();
-const { wizardOpen } = storeToRefs(toolchain);
+const { wizardOpen, status: toolStatus } = storeToRefs(toolchain);
+const lsp = useLspStore();
+
+// (Re)start requested language servers once the project is trusted / tools are ready.
+watch(
+  () => [info.value?.trusted, toolStatus.value?.ready] as const,
+  ([trusted, ready], [wasTrusted, wasReady]) => {
+    if ((trusted && !wasTrusted) || (ready && !wasReady)) void lsp.retry();
+  },
+);
 
 // Load the toolchain status whenever another project becomes active.
 watch(
   () => info.value?.id,
-  (id) => {
+  (id, previous) => {
+    if (previous !== undefined) void lsp.stopAll();
     toolchain.reset();
     if (id !== undefined) void toolchain.load(id);
   },
 );
 
 async function closeProject(): Promise<void> {
+  await lsp.stopAll();
   editor.closeAll();
   await project.close();
 }

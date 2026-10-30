@@ -147,5 +147,19 @@
     "statusReady": "Werkzeuge bereit",
     "statusMissing": "Werkzeuge fehlen",
     "open": "Werkzeuge einrichten"
+  },
+  "lsp": {
+    "name": {
+      "terraform": "Terraform-LS",
+      "ansible": "Ansible-LS"
+    },
+    "state": {
+      "off": "aus",
+      "starting": "startet",
+      "running": "läuft",
+      "restricted": "eingeschränkter Modus",
+      "unavailable": "Werkzeuge fehlen",
+      "failed": "fehlgeschlagen"
+    }
   }
 }

@@ -20,3 +20,6 @@ pnpm test
 step "bundle check"
 scripts/check-bundle.sh
 
+step "ansible-language-server bundle is reproducible"
+scripts/bundle-als.sh --check
+

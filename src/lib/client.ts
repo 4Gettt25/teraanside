@@ -8,11 +8,13 @@ import type { CounterEvent } from "./generated/CounterEvent";
 import type { CounterRequest } from "./generated/CounterRequest";
 import type { FileContent } from "./generated/FileContent";
 import type { InitialOpen } from "./generated/InitialOpen";
+import type { LspEvent } from "./generated/LspEvent";
 import type { Pong } from "./generated/Pong";
 import type { ProjectEvent } from "./generated/ProjectEvent";
 import type { ProjectInfo } from "./generated/ProjectInfo";
 import type { ProjectTree } from "./generated/ProjectTree";
 import type { RecentProject } from "./generated/RecentProject";
+import type { ServerKind } from "./generated/ServerKind";
 import type { SetupEvent } from "./generated/SetupEvent";
 import type { TerraformFlavor } from "./generated/TerraformFlavor";
 import type { ToolchainStatus } from "./generated/ToolchainStatus";
@@ -22,11 +24,13 @@ export type {
   CounterRequest,
   FileContent,
   InitialOpen,
+  LspEvent,
   Pong,
   ProjectEvent,
   ProjectInfo,
   ProjectTree,
   RecentProject,
+  ServerKind,
   SetupEvent,
   TerraformFlavor,
   ToolchainStatus,
@@ -136,4 +140,25 @@ export function toolchainSetup(
 
 export function toolchainCancel(): Promise<void> {
   return call<undefined>("toolchain_cancel", {});
+}
+
+/** Starts a language server for a trusted project; resolves to the session id. */
+export function lspStart(
+  projectId: number,
+  kind: ServerKind,
+  onEvent: (event: LspEvent) => void,
+): Promise<number> {
+  return call<number>("lsp_start", {
+    id: projectId,
+    kind,
+    onEvent: new Channel<LspEvent>(onEvent),
+  });
+}
+
+export function lspSend(sessionId: number, message: unknown): Promise<void> {
+  return call<undefined>("lsp_send", { session: sessionId, message });
+}
+
+export function lspStop(sessionId: number): Promise<void> {
+  return call<undefined>("lsp_stop", { session: sessionId });
 }

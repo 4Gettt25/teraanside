@@ -64,6 +64,10 @@ export async function openModel(absolutePath: string, text: string): Promise<Ope
   };
 }
 
+export function setLanguage(model: monaco.editor.ITextModel, languageId: string): void {
+  monaco.editor.setModelLanguage(model, languageId);
+}
+
 export function createEditor(
   container: HTMLElement,
   ariaLabel: string,

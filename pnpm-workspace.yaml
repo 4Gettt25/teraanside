@@ -98,3 +98,9 @@ minimumReleaseAgeExclude:
 auditConfig:
   ignoreGhsas:
     - GHSA-238p-pmpm-9mq7
+
+# Install scripts of dependencies are not run (pnpm default; every package must be listed).
+# esbuild's postinstall only validates/optimises the binary; the platform binary is installed
+# as optional dependency and works without the script.
+allowBuilds:
+  esbuild: false

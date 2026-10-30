@@ -4,7 +4,9 @@ import { storeToRefs } from "pinia";
 import { useI18n } from "vue-i18n";
 import { reportFrontendError } from "../../lib/client";
 import { useEditorStore } from "../../stores/editor";
+import { useLspStore } from "../../stores/lsp";
 import { useProjectStore } from "../../stores/project";
+import { isAnsibleFile } from "../../lib/lsp/ansibleFiles";
 import PlainEditor from "./PlainEditor.vue";
 
 // Monaco is several MB: load it only when the first file is opened.
@@ -14,7 +16,18 @@ const { t } = useI18n();
 const editor = useEditorStore();
 const project = useProjectStore();
 const { state, activeTab, error } = storeToRefs(editor);
-const { info } = storeToRefs(project);
+const { info, tree } = storeToRefs(project);
+const lsp = useLspStore();
+
+function languageFor(path: string): string | null {
+  const t = tree.value;
+  return t && isAnsibleFile(t.root, path, t.detected.ansible) ? "ansible" : null;
+}
+
+function onLanguage(languageId: string): void {
+  if (languageId === "terraform") void lsp.ensure("terraform");
+  else if (languageId === "ansible") void lsp.ensure("ansible");
+}
 const monacoFailed = ref(false);
 const tabRevisions = computed(() =>
   state.value.tabs.map((tab) => ({ path: tab.path, revision: tab.revision })),
@@ -84,9 +97,11 @@ function fileName(path: string): string {
           :path="activeTab.path"
           :tabs="tabRevisions"
           :read-only="activeTab.readOnly"
+          :language-for="languageFor"
           :label="t('editor.contentOf', { path: activeTab.path })"
           @change="editor.edited"
           @failed="onMonacoFailed"
+          @language="onLanguage"
         />
         <PlainEditor
           v-else
