@@ -42,6 +42,10 @@ impl Default for StopTimeouts {
 /// may still hold the pipes open) before they are killed.
 const DRAIN_AFTER_EXIT: Duration = Duration::from_secs(2);
 
+/// Retries when exec fails with ETXTBSY (see `start`).
+const SPAWN_BUSY_RETRIES: u32 = 10;
+const SPAWN_BUSY_DELAY: Duration = Duration::from_millis(20);
+
 #[derive(Debug, Clone)]
 pub struct RunSpec {
     /// Absolute path of the executable (no `PATH` lookup).
@@ -158,10 +162,27 @@ fn start(spec: &RunSpec, stdin_piped: bool) -> Result<Child, RunnerError> {
         .kill_on_drop(true);
     platform::current().prepare_command(&mut command);
 
-    let child = command.spawn().map_err(|source| RunnerError::Spawn {
-        program: spec.program.to_string(),
-        source,
-    })?;
+    // ETXTBSY: a freshly written executable (e.g. a just installed tool) can be
+    // briefly "busy" because another thread forked while its write handle was
+    // open; the child closes it on exec, so a short retry succeeds.
+    let mut attempt = 0;
+    let child = loop {
+        match command.spawn() {
+            Err(e)
+                if e.kind() == std::io::ErrorKind::ExecutableFileBusy
+                    && attempt < SPAWN_BUSY_RETRIES =>
+            {
+                attempt += 1;
+                std::thread::sleep(SPAWN_BUSY_DELAY);
+            }
+            result => {
+                break result.map_err(|source| RunnerError::Spawn {
+                    program: spec.program.to_string(),
+                    source,
+                })?;
+            }
+        }
+    };
     tracing::debug!(pid = child.id(), program = %spec.program, args = spec.args.len(), "process started");
     Ok(child)
 }

@@ -292,3 +292,25 @@ async fn stdio_mode_cancel_stops_the_process() {
     let outcome = p.handle.wait().await.unwrap();
     assert!(outcome.cancelled);
 }
+
+/// Regression: exec of a freshly written file failed with ETXTBSY ("Text file busy")
+/// when a write handle was still open somewhere (flaky test, also possible right
+/// after installing a tool). The runner retries briefly.
+#[tokio::test]
+async fn retries_spawn_while_executable_is_busy() {
+    use std::io::Write;
+    let dir = tempfile::tempdir().unwrap();
+    let path = Utf8PathBuf::from_path_buf(dir.path().join("busy-tool")).unwrap();
+    let mut handle = std::fs::File::create(&path).unwrap();
+    handle.write_all(b"#!/bin/sh\necho ran\n").unwrap();
+    std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o755)).unwrap();
+    // keep the write handle open for 60 ms -> the first exec attempts get ETXTBSY
+    let releaser = std::thread::spawn(move || {
+        std::thread::sleep(Duration::from_millis(60));
+        drop(handle);
+    });
+    let (events, outcome) = run(spec(&path)).await;
+    releaser.join().unwrap();
+    assert_eq!(outcome.code, Some(0));
+    assert_eq!(lines(&events, OutputStream::Stdout), ["ran"]);
+}
