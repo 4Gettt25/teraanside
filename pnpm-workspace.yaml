@@ -5,6 +5,10 @@ overrides:
   # Security fix: @codingame/* pin dompurify 3.4.15 (GHSA-cg2g-xh64-v4q7 critical,
   # GHSA-mrv2-3pqr-j5jr high, 3 low); 3.4.17 is the patched patch release (>= 14 days old).
   dompurify: "3.4.17"
+  # Security fix: fast-uri < 3.1.9 (via @ansible/ansible-language-server > ajv, bundled into the
+  # ALS resource): GHSA-w74x-v6f9-j3xg, GHSA-wjr9-j795-jxcr (moderate), GHSA-xhq7-xmqj-769h,
+  # GHSA-333x-w4r6-6crp (low). 3.1.9 is younger than 14 days -> security exception below.
+  fast-uri: "3.1.9"
 
 # Supply-chain policy (CLAUDE.md "Versionsregel"): only install versions published >= 14 days ago.
 # pnpm enforces this for all dependencies incl. transitive ones and re-verifies the lockfile.
@@ -16,6 +20,8 @@ minimumReleaseAgeExclude:
   # Grandfathered: resolved during M0 (2026-10-28), before the rule existed.
   # Exact versions only; all of them are >= 14 days old by 2026-11-10 -> delete this block then.
   # Security-fix exceptions go below with a link to the advisory/CVE.
+  # https://github.com/advisories/GHSA-w74x-v6f9-j3xg https://github.com/advisories/GHSA-wjr9-j795-jxcr
+  - "fast-uri@3.1.9"
   - "@asamuzakjp/css-color@7.1.9"
   - "@asamuzakjp/dom-selector@10.0.5"
   - "@babel/helper-string-parser@7.29.11"

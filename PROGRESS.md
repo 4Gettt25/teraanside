@@ -4,8 +4,7 @@
 > `DESIGN.md` (Architektur, Entscheidungen, §14 offene Fragen) und `CLAUDE.md` (Regeln,
 > Befehle). Diese Datei beschreibt nur, **wo wir stehen und was als Nächstes kommt**.
 >
-> Stand: 2026-10-30 · Branch `main` gepusht (`aa3bab6` + dieser Doku-Commit), CI grün
-> ([Run 40973247344](https://github.com/4Gettt25/teraanside/actions/runs/40973247344), 7 min 38 s inkl. Crate-Alters-Prüfung)
+> Stand: 2026-10-30 · Branch `main` gepusht, CI siehe unten. **M1 ist umgesetzt und wartet auf die Abnahme durch den Nutzer.**
 
 ## Überblick
 
@@ -14,18 +13,21 @@
 | M0 Skeleton | ✅ abgenommen, CI grün (GitHub Actions) |
 | M1 Spike (#2 Node für ALS, #4 LSP-Transport) | ✅ entschieden, in `DESIGN.md` §14.1/§14.2; Spike-Code auf Branch `spike/m1-lsp` (gepusht, nicht für `main`) |
 | M1a Projekt, Editor, Vertrauen | ✅ umgesetzt (Nutzer hat mit „weiter mit M1b“ fortgesetzt) |
-| M1b Runner-Grundversion, Toolchain, Assistent | ✅ umgesetzt und gepusht, **Durchsicht durch den Nutzer steht aus** (Haltepunkt) |
-| M1c LSP (terraform-ls, ansible-language-server) | ⏳ darf nach M1b bis zur M1-Abnahme durchlaufen |
+| M1b Runner-Grundversion, Toolchain, Assistent | ✅ umgesetzt; Review des Assistenten durch den Nutzer läuft parallel |
+| Zwischenschritt (Nutzer 2026-10-30) | ✅ jschardet-Stub + Nicht-UTF-8 schreibgeschützt; Zip-Slip-/Download-Härtungstests; CI parallel + cargo-deny/pnpm audit (PR + wöchentlich) |
+| M1c LSP (terraform-ls, ansible-language-server) | ✅ umgesetzt, Abnahme in der gebauten App gemessen (`DESIGN.md` §4.6) – **wartet auf Abnahme durch den Nutzer** |
+| PyPI-Hash-Lock | ⏳ eigener Schritt nach M1-Abnahme, vor M2 (`DESIGN.md` §14 #17) |
 | M2–M5 | nicht begonnen |
 
-## Offene Entscheidungen des Nutzers (vor M1c klären)
+## Offene Punkte für den Nutzer
 
-1. ~~Push~~ – erledigt 2026-10-30 (Nutzer hat freigegeben), CI grün.
-2. **`jschardet` (LGPL-2.1+)** im Monaco-Bundle (`DESIGN.md` §14 #15): Vorschlag ist, es per
-   Vite-`resolve.alias` durch einen Stub zu ersetzen (wir lesen nur UTF-8 im Core). Antwort steht aus.
-3. Durchsicht M1b (Assistent ansehen: `pnpm tauri dev`, Terraform-/Ansible-Repo öffnen, vertrauen).
-4. Vorschläge aus `DESIGN.md` §14 #17 (PyPI-Hash-Lock) und #18 (`cargo audit`/`pnpm audit` in CI):
-   jetzt, oder als Folgeaufgaben nach M1?
+1. **M1-Abnahme** (`DESIGN.md` §12: Beispielrepo öffnen → Tools eingerichtet → Completion + Diagnostics):
+   `pnpm tauri dev`, `examples/demo-infra` öffnen, vertrauen, Assistent ausführen, `terraform/main.tf`
+   bzw. `roles/hello/tasks/main.yml` öffnen. Messwerte der automatisierten Abnahme: `DESIGN.md` §4.6.
+2. Review des Einrichtungsassistenten (M1b) – läuft beim Nutzer.
+3. Branch-Schutz auf GitHub (CI-Jobs als „required checks“ für PRs) muss der Nutzer in den
+   Repo-Einstellungen setzen; die Jobs selbst sind blockierend konfiguriert.
+4. Danach: PyPI-Hash-Lock (eigener Schritt), dann M2 mit den zurückgestellten Spikes #5/#7.
 
 ## Getroffene Entscheidungen (Kurzfassung, Details in DESIGN.md)
 
@@ -50,6 +52,15 @@
   Einrichtung führt keinen Projektcode aus → braucht kein Vertrauen.
 - Sicherheitsausnahmen von der 14-Tage-Regel: `rustls-webpki` 0.103.16 (RUSTSEC-2026-0382),
   `webpki-root-certs` 1.0.10 (RUSTSEC-2026-0383), siehe `supply-chain/crate-age-exceptions.txt`.
+- jschardet (LGPL) per pnpm-Override durch `stubs/jschardet` ersetzt; Nicht-UTF-8-Dateien werden
+  schreibgeschützt geöffnet, der Core schreibt sie nie (`DESIGN.md` §4.1, §14 #15).
+- Supply chain: `deny.toml` (Advisories, Lizenz-Allowlist, Quellen), `pnpm audit`, npm-Lizenz-Allowlist;
+  Ignores nur mit Begründung + Ablaufdatum (`deny.toml`, `supply-chain/pnpm-audit-ignores.toml`);
+  dompurify per Override auf 3.4.17 (Sicherheitsfix), fast-uri per Override auf 3.1.9 (Sicherheitsausnahme,
+  ALS wird dafür aus `lib/` gebündelt, `DESIGN.md` §14 #19), katex-Ignore bis 2027-01-31, Rust-Ignores
+  (rsa/crypto-bigint/proc-macro-error) bis 2027-04-30 → **vor Ablauf neu bewerten**.
+- LSP (M1c): Neustart client-seitig, Core-Budget 3/60 s; Core erzwingt ALS-Einstellungen
+  (`executionEnvironment.enabled=false`, venv-Pfade); ALS gebündelt in `src-tauri/resources/als/`.
 - Monaco: monaco-languageclient **11.0.2** + `@codingame/*` **37.6.0** (Spike nutzte 11.0.3/37.6.1,
   zu jung). Grammatiken aus `hashicorp/syntax` @ `183de4f` (MPL-2.0, unverändert).
 - CSP: `'wasm-unsafe-eval'` nötig (TextMate/Oniguruma, nachgewiesen), kein `'unsafe-eval'`.
@@ -84,21 +95,24 @@
 - Frontend: `src/features/toolchain/SetupWizard.vue`, `src/stores/{toolchain,setupReducer}.ts`.
 - Netztests (manuell): `cd src-tauri && cargo test real_ -- --ignored --nocapture`.
 
-## Nach M1c, vor M2: PyPI-Hash-Lock (eigener Schritt)
+## Nach M1-Abnahme, vor M2: PyPI-Hash-Lock (eigener Schritt)
 
 Vom Nutzer so festgelegt (2026-10-30), Details `DESIGN.md` §14 #17: erste Einrichtung löst auf
 und schreibt eine Lockdatei mit Hashes nach `.iac-studio/`, danach `uv pip install --require-hashes`.
 `--exclude-newer P14D` existiert in uv 0.13.1 (geprüft) und gilt auch beim Erzeugen der Lockdatei.
 
-## Danach: M1c (darf bis zur Abnahme durchlaufen)
+## Was M1c enthält (Code-Landkarte)
 
-- `core/lsp` nach `DESIGN.md` §4.6; zuerst terraform-ls, dann ansible-language-server.
-- `scripts/bundle-als.sh` (esbuild, `--legal-comments=external`), ALS-Lizenzprüfung →
-  `THIRD_PARTY_LICENSES.md`.
-- **TrustedProject auch für LSP-Starts und ansible-lint; Laufzeittest, dass beides ohne
-  Vertrauen nicht startet** (Vorgabe des Nutzers, noch offen).
-- Beispielrepo `examples/demo-infra/` (Terraform null-Provider + Ansible localhost), Abnahme M1:
-  Repo öffnen → Tools eingerichtet → Completion + Diagnostics.
+- `src-tauri/src/core/runner/` – zusätzlich Stdio-Modus (`spawn_stdio`) und ETXTBSY-Retry.
+- `core/lsp/framing.rs` (Content-Length-Codec), `session.rs` (Reader/Writer, Stop-Ablauf),
+  `servers.rs` (Startparameter, erzwungene ALS-Einstellungen), `mod.rs` (`LspManager`,
+  `TrustedProject`, Neustart-Budget); Tests mit Fake-Server in `lsp/tests.rs`,
+  Netztest `lsp/real_tests.rs`.
+- `commands/lsp.rs` – `lsp_start/send/stop`; App-Ende stoppt alle Server.
+- Frontend: `src/features/editor/monaco/languageClients.ts`, `src/lib/lsp/` (Ansible-Dateien,
+  Neustart-Regel), `src/stores/lsp.ts`, Statusleiste.
+- `scripts/bundle-als.sh`, `scripts/als-licenses.py`, `src-tauri/resources/als/`.
+- `examples/demo-infra/` – Beispielrepo.
 
 ## Zurückgestellte Aufträge (erst nach M1-Abnahme)
 
@@ -128,4 +142,12 @@ Jeweils: erst Plan zeigen, dann Ergebnisse, auf Freigabe warten.
 - `cargo update -p <crate> --precise <v>` für zu junge transitive Crates; vorher RustSec prüfen
   (`gh api repos/rustsec/advisory-db/contents/crates/<crate>`), ob die neue Version ein Fix ist.
 - `gh` ist authentifiziert; Pushen nur nach Rückfrage (Freigaben gelten pro Anlass).
-- CI braucht mit den Krypto-Crates ca. 8 min (vorher ca. 3,5 min).
+- CI: drei parallele Jobs (rust ~5 min, frontend <1 min, supply chain <1 min) + wöchentlicher
+  Supply-Chain-Lauf (Montag 05:17 UTC). Lokal: `scripts/check.sh`; `scripts/supply-chain.sh`
+  braucht `cargo-deny` 0.20.2 auf dem PATH (Download mit SHA256 wie in `supply-chain.yml`).
+- Lokales Rust ist inzwischen 1.99.1 (Arch-Update); CI ist über `rust-toolchain.toml` auf 1.97.1
+  gepinnt. Neue Clippy-Lints können lokal früher anschlagen.
+- Kleiner Rechner (5,8 GB RAM): Dev-Profil ohne Debug-Infos für Abhängigkeiten; trotzdem nie zwei
+  Cargo-Builds parallel starten. `src-tauri/target` ist ~26 GB groß (bei Platzmangel `cargo clean`).
+- Abnahme-Smoke-Test der echten App: Proben vorübergehend in `App.vue`/`EditorArea.vue` einbauen
+  (Ausgabe über `reportFrontendError`), danach restlos entfernen.
